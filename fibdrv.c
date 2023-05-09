@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include "bn.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -24,20 +25,52 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-static long long fib_sequence(long long k)
+// static long long fib_sequence(long long k)
+// {
+//     /* FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel.
+//     */ long long f[k + 2]; f[0] = 0; f[1] = 1;
+
+//     for (int i = 2; i <= k; i++) {
+//         f[i] = f[i - 1] + f[i - 2];
+//     }
+
+//     return f[k];
+// }
+
+static inline struct list_head *fib_sequence(long long k)
 {
-    /* FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel. */
-    long long f[k + 2];
-
-    f[0] = 0;
-    f[1] = 1;
-
+    struct list_head *a, *b;
+    a = bn_new(0);
+    b = bn_new(1);
+    bn_set(a, 1);
+    bn_set(b, 1);
     for (int i = 2; i <= k; i++) {
-        f[i] = f[i - 1] + f[i - 2];
+        bn_add(a, b);
     }
+    if (k & 1) {
+        bn_free(a);
+        return b;
+    }
+    bn_free(b);
+    return a;
+};
 
-    return f[k];
-}
+// fast doubling
+// static inline uint64_t fast_doubling(uint32_t target)
+// {
+//     if (target <= 2)
+//         return !!target;
+
+//     // fib(2n) = fib(n) * (2 * fib(n+1) − fib(n))
+//     // fib(2n+1) = fib(n) * fib(n) + fib(n+1) * fib(n+1)
+//     uint64_t n = fast_doubling(target >> 1);
+//     uint64_t n1 = fast_doubling((target >> 1) + 1);
+
+//     // check 2n or 2n+1
+//     if (target & 1)
+//         return n * n + n1 * n1;
+//     return n * ((n1 << 1) - n);
+// }
 
 static int fib_open(struct inode *inode, struct file *file)
 {
@@ -60,7 +93,29 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    printk(KERN_INFO "fibdrv: reading\n");
+    ssize_t errno = 1;
+    struct list_head *a = bn_new(0);
+    struct list_head *b = bn_new(1);
+    bn_set(a, 0);
+    bn_set(b, 1);
+    for (int i = 2; i <= *offset; i++) {
+        bn_add(a, b);
+    }
+    char *ret = bn_to_string(((*offset) & 1) ? b : a);
+    if (!ret) {
+        printk(KERN_INFO "fibdrv: read string failed\n");
+        return -1;
+    }
+    printk(KERN_INFO "fibdrv: read %s\n", ret);
+    if (copy_to_user(buf, ret, strlen(ret))) {
+        printk(KERN_INFO "fibdrv: copy to user failed\n");
+        errno = -EFAULT;
+    };
+    bn_free(a);
+    bn_free(b);
+    kfree(ret);
+    return errno;
 }
 
 /* write operation is skipped */
