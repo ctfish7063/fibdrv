@@ -18,7 +18,7 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 92
+#define MAX_LENGTH 100
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
@@ -93,7 +93,7 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    printk(KERN_INFO "fibdrv: reading\n");
+    printk(KERN_INFO "fibdrv: reading on offset %lld \n", *offset);
     ssize_t errno = 1;
     struct list_head *a = bn_new(0);
     struct list_head *b = bn_new(1);
