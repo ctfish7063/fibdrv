@@ -37,22 +37,19 @@ static DEFINE_MUTEX(fib_mutex);
 //     return f[k];
 // }
 
-static inline struct list_head *fib_sequence(long long k)
+static inline char *fib_sequence(long long k)
 {
-    struct list_head *a, *b;
-    a = bn_new(0);
-    b = bn_new(1);
-    bn_set(a, 1);
+    struct list_head *a = bn_new(0);
+    struct list_head *b = bn_new(1);
+    bn_set(a, 0);
     bn_set(b, 1);
     for (int i = 2; i <= k; i++) {
         bn_add(a, b);
     }
-    if (k & 1) {
-        bn_free(a);
-        return b;
-    }
+    char *ret = bn_to_string((k & 1) ? b : a);
+    bn_free(a);
     bn_free(b);
-    return a;
+    return ret;
 };
 
 // fast doubling
@@ -93,16 +90,9 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    printk(KERN_INFO "fibdrv: reading on offset %lld \n", *offset);
     ssize_t errno = 1;
-    struct list_head *a = bn_new(0);
-    struct list_head *b = bn_new(1);
-    bn_set(a, 0);
-    bn_set(b, 1);
-    for (int i = 2; i <= *offset; i++) {
-        bn_add(a, b);
-    }
-    char *ret = bn_to_string(((*offset) & 1) ? b : a);
+    printk(KERN_INFO "fibdrv: reading on offset %lld \n", *offset);
+    char *ret = fib_sequence(*offset);
     if (!ret) {
         printk(KERN_INFO "fibdrv: read string failed\n");
         return -1;
@@ -112,8 +102,6 @@ static ssize_t fib_read(struct file *file,
         printk(KERN_INFO "fibdrv: copy to user failed\n");
         errno = -EFAULT;
     };
-    bn_free(a);
-    bn_free(b);
     kfree(ret);
     return errno;
 }
