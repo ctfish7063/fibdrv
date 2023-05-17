@@ -15,6 +15,9 @@
 #define LOG10SQRT5 349485
 #define LOG2_10 3321928
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 // static array to find power of 10 in O(1)
 static const uint64_t pow10[MAX_DIGITS] = {1UL,
                                            10UL,

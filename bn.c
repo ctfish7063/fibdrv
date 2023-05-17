@@ -70,13 +70,21 @@ char *bn_to_string(struct list_head *head)
     size_t size = (bn_list->size - 1) * MAX_DIGITS + ceil + 1;
     char *str = kmalloc(size * sizeof(char), GFP_KERNEL);
     str[--size] = '\0';
-    bn_node *node;
-    list_for_each_entry (node, head, list) {
-        uint64_t num = node->val;
-        if (!num)
-            str[--size] = '0';
-        for (; num > 0; num /= 10) {
-            str[--size] = num % 10 + '0';
+    // if the bn represent a zero
+    if (unlikely(list_last_entry(head, bn_node, list)->val == 0 &&
+                 list_is_singular(head))) {
+        str[--size] = '0';
+    } else {
+        bn_node *node;
+        list_for_each_entry (node, head, list) {
+            uint64_t num = node->val;
+            size_t tmp_size = size;
+            for (; num > 0; num /= 10) {
+                str[--size] = num % 10 + '0';
+            }
+            while (tmp_size - size < MAX_DIGITS && size > 0) {
+                str[--size] = '0';
+            }
         }
     }
     return str;
