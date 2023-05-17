@@ -45,12 +45,56 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
 
 void bn_lshift(struct list_head *head, int bit)
 {
-    ;
+    if (bit <= 4) {
+        __bn_lshift(head, bit);
+    } else {
+        while (bit > 4) {
+            __bn_lshift(head, 4);
+            bit -= 4;
+        }
+        __bn_lshift(head, bit);
+    }
+}
+
+void __bn_lshift(struct list_head *head, int bit)
+{
+    int carry = 0;
+    bn_node *node;
+    list_for_each_entry (node, head, list) {
+        node->val <<= bit;
+        node->val += carry;
+        carry = node->val / BOUND;
+        node->val %= BOUND;
+    }
+    if (carry) {
+        bn_newnode(head, carry);
+    }
 }
 
 void bn_rshift(struct list_head *head, int bit)
 {
-    ;
+    for (int i = 0; i < bit; i++) {
+        __bn_rshift(head);
+    }
+}
+
+void __bn_rshift(struct list_head *head)
+{
+    uint64_t carry = 0;
+    bn_node *node;
+    list_for_each_entry_reverse(node, head, list)
+    {
+        uint64_t tmp = node->val & 1;
+        node->val >>= 1;
+        node->val += carry;
+        carry = tmp * BOUND / 2;
+    }
+    bn_node *last = list_last_entry(head, bn_node, list);
+    if (last->val == 0) {
+        list_entry(head, bn_head, list)->size--;
+        list_del(&last->list);
+        kfree(last);
+    }
 }
 
 char *bn_to_string(struct list_head *head)

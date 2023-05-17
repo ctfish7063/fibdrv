@@ -163,7 +163,12 @@ static inline void bn_set(struct list_head *head, uint64_t val)
  */
 void bn_add(struct list_head *a, struct list_head *b);
 
-
+/**
+ * __bn_add: add two bns to the first one
+ * the result is expected to be positive
+ * @shorter: first bn
+ * @longer: second bn
+ */
 void __bn_add(struct list_head *shorter, struct list_head *longer);
 
 /**
@@ -194,11 +199,27 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c);
 void bn_lshift(struct list_head *head, int bit);
 
 /**
+ * __bn_lshift: left shift a bn by bit
+ * Number of bits to be shifted is expected to be smaller than 4,
+ * since (10^18-1) << 4 < UINT64_MAX
+ * @head: bn to be shifted
+ * @bit: number of bits to be shifted
+ */
+void __bn_lshift(struct list_head *head, int bit);
+
+/**
  * bn_rshift: right shift a bn by bit
  * @head: bn to be shifted
  * @bit: number of bits to be shifted
  */
 void bn_rshift(struct list_head *head, int bit);
+
+/**
+ * __bn_rshift: right shift a bn by a bit
+ * @head: bn to be shifted
+ * @bit: number of bits to be shifted
+ */
+void __bn_rshift(struct list_head *head);
 
 /**
  * bn_to_string: convert a bn list to string
