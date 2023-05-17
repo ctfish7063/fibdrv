@@ -134,7 +134,8 @@ static inline void bn_expand(struct list_head *head, size_t n)
 
 /**
  * bn_set: set the value of a bn list
- * The set value should be within 2^63-1
+ * The set value should be within UINT64_MAX
+ * If the set value has more digits than the list, expand the list
  * @head: head of the bn list
  * @val: value to be set
  */
@@ -145,6 +146,9 @@ static inline void bn_set(struct list_head *head, uint64_t val)
     list_for_each_entry (node, head, list) {
         node->val = value % BOUND;
         value /= BOUND;
+    }
+    if (value) {
+        bn_newnode(head, value);
     }
 }
 
