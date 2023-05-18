@@ -108,7 +108,7 @@ char *bn_to_string(struct list_head *head)
 
     size_t ceil = MAX_DIGITS;
     for (size_t floor = 0; floor + 1 != ceil;) {
-        size_t *new = first_num > pow10[(floor + ceil) / 2] ? &floor : &ceil;
+        size_t *new = first_num >= pow10[(floor + ceil) / 2] ? &floor : &ceil;
         *new = (floor + ceil) / 2;
     }
     size_t size = (bn_list->size - 1) * MAX_DIGITS + ceil + 1;
