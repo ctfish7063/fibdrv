@@ -198,6 +198,21 @@ static inline void bn_clean(struct list_head *head)
 }
 
 /**
+ * bn_print: print a bn list
+ * For debugging purpose
+ * @head: head of the bn list
+ */
+static inline void bn_print(struct list_head *head)
+{
+    bn_node *node;
+    list_for_each_entry_reverse(node, head, list)
+    {
+        printk(KERN_INFO "/%llu", node->val);
+    }
+    printk(KERN_INFO "\n");
+}
+
+/**
  * bn_add: add two bn a, b to the previous one
  *
  * @a: first bn
