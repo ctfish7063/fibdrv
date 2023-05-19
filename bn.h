@@ -124,17 +124,6 @@ static inline struct list_head *bn_new(size_t n)
     return head;
 }
 
-static inline void bn_expand(struct list_head *head, size_t n)
-{
-    size_t n_size = (n * LOG10PHI - LOG10SQRT5) / DIVISOR / MAX_DIGITS + 1;
-    size_t expand = n_size - list_entry(head, bn_head, list)->size;
-    if (expand == 0)
-        return;
-    for (; expand; expand--) {
-        bn_newnode(head, 0);
-    }
-}
-
 /**
  * bn_set: set the value of a bn list
  * The set value should be within UINT64_MAX
