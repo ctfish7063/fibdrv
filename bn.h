@@ -145,6 +145,59 @@ static inline void bn_set(struct list_head *head, uint64_t val)
 }
 
 /**
+ * bn_copy: copy a bn list to another
+ * @dest: destination bn list to be copied to
+ * @target: target bn list to be copied from
+ */
+static inline void bn_copy(struct list_head *dest, struct list_head *target)
+{
+    if (list_is_singular(target)) {
+        list_first_entry(dest, bn_node, list)->val =
+            list_first_entry(target, bn_node, list)->val;
+        return;
+    }
+    bn_node *node;
+    struct list_head *cur = dest->next;
+    uint8_t size = 0;
+    list_for_each_entry (node, target, list) {
+        if (!node->val && ++size < list_entry(target, bn_head, list)->size)
+            continue;
+        if (cur != dest) {
+            list_entry(cur, bn_node, list)->val = node->val;
+            cur = cur->next;
+        } else {
+            bn_newnode(dest, node->val);
+        }
+    }
+    while (cur != dest) {
+        struct list_head *tmp = cur->next;
+        list_del(cur);
+        kfree(list_entry(cur, bn_node, list));
+        list_entry(dest, bn_head, list)->size--;
+        cur = tmp;
+    }
+}
+
+/**
+ * bn_clean: remove the leading zeros of a bn list
+ * @head: head of the bn list
+ */
+static inline void bn_clean(struct list_head *head)
+{
+    if (list_empty(head) || list_is_singular(head))
+        return;
+    bn_node *node, *tmp;
+    list_for_each_entry_safe_reverse(node, tmp, head, list)
+    {
+        if (node->val || list_is_singular(head))
+            break;
+        list_del(&node->list);
+        kfree(node);
+        list_entry(head, bn_head, list)->size--;
+    }
+}
+
+/**
  * bn_add: add two bn a, b to the shorter one
  *
  * @a: first bn
@@ -170,6 +223,8 @@ void __bn_add(struct list_head *shorter, struct list_head *longer);
 
  */
 void bn_sub(struct list_head *a, struct list_head *b, struct list_head *c);
+
+void __bn_sub(struct list_head *a, struct list_head *b);
 
 /**
  * bn_mul: multiply two bns and store result to c
