@@ -2,6 +2,11 @@
 
 void bn_add(struct list_head *a, struct list_head *b)
 {
+    __bn_add(a, b);
+}
+
+void bn_add_to_smaller(struct list_head *a, struct list_head *b)
+{
     int cmp = bn_cmp(a, b);
     if (cmp >= 0) {
         __bn_add(b, a);
@@ -20,6 +25,9 @@ void __bn_add(struct list_head *shorter, struct list_head *longer)
         carry = node->val / BOUND;
         node->val %= BOUND;
         longer_cur = longer_cur->next;
+        if (longer_cur == longer) {
+            break;
+        }
     }
     while (longer_cur != longer) {
         bn_newnode(shorter, list_entry(longer_cur, bn_node, list)->val + carry);
@@ -29,7 +37,12 @@ void __bn_add(struct list_head *shorter, struct list_head *longer)
         longer_cur = longer_cur->next;
     }
     if (carry) {
-        bn_newnode(shorter, carry);
+        if (list_entry(shorter, bn_head, list)->size >
+            list_entry(longer, bn_head, list)->size) {
+            node = list_entry(node->list.next, bn_node, list);
+            node->val += carry;
+        } else
+            bn_newnode(shorter, carry);
     }
 }
 

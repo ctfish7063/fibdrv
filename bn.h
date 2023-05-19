@@ -198,12 +198,19 @@ static inline void bn_clean(struct list_head *head)
 }
 
 /**
- * bn_add: add two bn a, b to the shorter one
+ * bn_add: add two bn a, b to the previous one
  *
  * @a: first bn
  * @b: second bn
  */
 void bn_add(struct list_head *a, struct list_head *b);
+
+/**
+ * bn_add_to_smaller: add two bns a, b to the smaller one
+ * @a: first bn
+ * @b: second bn
+ */
+void bn_add_to_smaller(struct list_head *a, struct list_head *b);
 
 /**
  * __bn_add: add two bns to the first one
