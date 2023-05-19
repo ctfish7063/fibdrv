@@ -19,25 +19,15 @@ MODULE_VERSION("0.1");
  * ssize_t can't fit the number > 92
  */
 #define MAX_LENGTH 100
+#define CLZ(x) __builtin_clzll(x)
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-// static long long fib_sequence(long long k)
-// {
-//     /* FIXME: C99 variable-length array (VLA) is not allowed in Linux kernel.
-//     */ long long f[k + 2]; f[0] = 0; f[1] = 1;
-
-//     for (int i = 2; i <= k; i++) {
-//         f[i] = f[i - 1] + f[i - 2];
-//     }
-
-//     return f[k];
-// }
-
-static inline char *fib_sequence(long long k)
+// naive fibonacci calculation
+static inline char *fib_sequence_naive(long long k)
 {
     struct list_head *a = bn_new(0);
     struct list_head *b = bn_new(1);
@@ -53,21 +43,73 @@ static inline char *fib_sequence(long long k)
 };
 
 // fast doubling
-// static inline uint64_t fast_doubling(uint32_t target)
-// {
-//     if (target <= 2)
-//         return !!target;
+void fast_doubling(struct list_head *fib_n0,
+                   struct list_head *fib_n1,
+                   struct list_head *fib_2n0,
+                   struct list_head *fib_2n1)
+{
+    // fib(2n+1) = fib(n)^2 + fib(n+1)^2
+    // use fib_2n0 to store the result temporarily
+    bn_mul(fib_n0, fib_n0, fib_2n1);
+    // bn_print(fib_2n1);
+    bn_mul(fib_n1, fib_n1, fib_2n0);
+    // bn_print(fib_2n0);
+    bn_add(fib_2n1, fib_2n0);
+    // bn_print(fib_2n1);
+    // fib(2n) = fib(n) * (2 * fib(n+1) - fib(n))
+    bn_lshift(fib_n1, 1);
+    bn_sub(fib_n1, fib_n0);
+    // bn_print(fib_n1);
+    bn_mul(fib_n1, fib_n0, fib_2n0);
+}
 
-//     // fib(2n) = fib(n) * (2 * fib(n+1) − fib(n))
-//     // fib(2n+1) = fib(n) * fib(n) + fib(n+1) * fib(n+1)
-//     uint64_t n = fast_doubling(target >> 1);
-//     uint64_t n1 = fast_doubling((target >> 1) + 1);
-
-//     // check 2n or 2n+1
-//     if (target & 1)
-//         return n * n + n1 * n1;
-//     return n * ((n1 << 1) - n);
-// }
+/**
+ * fib_sequence: calculate the fibonacci number with fast doubling algorithm.
+ * It's a bottom up approach to avoid recursion.
+ * @param k: the index of the fibonacci number
+ * @return: the fibonacci number in char*
+ */
+static inline char *fib_sequence(long long k)
+{
+    if (unlikely(k < 0)) {
+        return NULL;
+    }
+    // return fib[n] without calculation for n <= 2
+    if (unlikely(k <= 2)) {
+        char *res = kmalloc(sizeof(char) * 2, GFP_KERNEL);
+        res[0] = !!k + '0';
+        res[1] = '\0';
+        return res;
+    }
+    // starting from n = 1, fib[n] = 1, fib [n+1] = 1
+    uint8_t count = 63 - CLZ(k);
+    struct list_head *a = bn_new(k / 2);
+    struct list_head *b = bn_new(k / 2 + 1);
+    struct list_head *c = bn_new(k);
+    struct list_head *d = bn_new(k + 1);
+    bn_set(a, 1);
+    bn_set(b, 1);
+    int n = 1;
+    for (uint8_t i = count; i-- > 0;) {
+        fast_doubling(a, b, c, d);
+        if (k & (1LL << i)) {
+            bn_copy(a, d);
+            bn_add(c, d);
+            bn_copy(b, c);
+            n = 2 * n + 1;
+        } else {
+            bn_copy(a, c);
+            bn_copy(b, d);
+            n = 2 * n;
+        }
+    }
+    char *res = bn_to_string(a);
+    bn_free(a);
+    bn_free(b);
+    bn_free(c);
+    bn_free(d);
+    return res;
+}
 
 static int fib_open(struct inode *inode, struct file *file)
 {
