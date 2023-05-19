@@ -229,7 +229,7 @@ void __bn_add(struct list_head *shorter, struct list_head *longer);
  * @b: second bn
 
  */
-void bn_sub(struct list_head *a, struct list_head *b, struct list_head *c);
+void bn_sub(struct list_head *a, struct list_head *b);
 
 void __bn_sub(struct list_head *a, struct list_head *b);
 

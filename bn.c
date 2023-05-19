@@ -46,14 +46,65 @@ void __bn_add(struct list_head *shorter, struct list_head *longer)
     }
 }
 
-void bn_sub(struct list_head *a, struct list_head *b, struct list_head *c)
+void bn_sub(struct list_head *a, struct list_head *b)
 {
-    ;
+    int cmp = bn_cmp(a, b);
+    if (cmp >= 0) {
+        __bn_sub(a, b);
+    } else {
+        __bn_sub(b, a);
+    }
+}
+
+void __bn_sub(struct list_head *more, struct list_head *less)
+{
+    int carry = 0;
+    bn_node *node;
+    struct list_head *less_cur = less->next;
+    list_for_each_entry (node, more, list) {
+        uint64_t tmp = (less_cur == less)
+                           ? carry
+                           : list_entry(less_cur, bn_node, list)->val + carry;
+        if (node->val >= tmp) {
+            node->val -= tmp;
+            carry = 0;
+        } else {
+            node->val += BOUND - tmp;
+            carry = 1;
+        }
+        if (less_cur != less) {
+            less_cur = less_cur->next;
+        }
+    }
+    bn_node *last = list_last_entry(more, bn_node, list);
+    if (last->val == 0 && likely(!list_is_singular(more))) {
+        list_entry(more, bn_head, list)->size--;
+        list_del(&last->list);
+        kfree(last);
+    }
 }
 
 void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
 {
-    ;
+    struct list_head *tmp_a = bn_new(0);
+    struct list_head *tmp_b = bn_new(0);
+    bn_copy(tmp_a, a);
+    bn_copy(tmp_b, b);
+    bn_node *node;
+    // zeroing c
+    list_for_each_entry (node, c, list) {
+        node->val = 0;
+    }
+    while (!list_empty(tmp_b)) {
+        uint64_t bit = list_first_entry(tmp_b, bn_node, list)->val;
+        if (bit & 1) {
+            bn_add(c, tmp_a);
+        }
+        bn_rshift(tmp_b, 1);
+        bn_lshift(tmp_a, 1);
+    }
+    bn_free(tmp_a);
+    bn_free(tmp_b);
 }
 
 void bn_lshift(struct list_head *head, int bit)
