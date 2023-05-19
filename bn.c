@@ -163,10 +163,10 @@ void __bn_rshift(struct list_head *head)
 
 char *bn_to_string(struct list_head *head)
 {
-    // printf("\nbn_to_string");
     if (!head || list_empty(head)) {
         return NULL;
     }
+    bn_clean(head);
     bn_head *bn_list = list_entry(head, bn_head, list);
     uint64_t first_num = list_last_entry(head, bn_node, list)->val;
 
