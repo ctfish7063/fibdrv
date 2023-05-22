@@ -18,13 +18,14 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 100
+#define MAX_LENGTH 10000
 #define CLZ(x) __builtin_clzll(x)
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
+static ktime_t kt;
 
 // naive fibonacci calculation
 static inline char *fib_sequence_naive(long long k)
@@ -34,7 +35,7 @@ static inline char *fib_sequence_naive(long long k)
     bn_set(a, 0);
     bn_set(b, 1);
     for (int i = 2; i <= k; i++) {
-        bn_add(a, b);
+        bn_add_to_smaller(a, b);
     }
     char *ret = bn_to_string((k & 1) ? b : a);
     bn_free(a);
@@ -111,6 +112,14 @@ static inline char *fib_sequence(long long k)
     return res;
 }
 
+static char *fib_time_proxy(long long k)
+{
+    kt = ktime_get();
+    char *ret = fib_sequence(k);
+    kt = ktime_sub(ktime_get(), kt);
+    return ret;
+}
+
 static int fib_open(struct inode *inode, struct file *file)
 {
     if (!mutex_trylock(&fib_mutex)) {
@@ -132,20 +141,19 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    ssize_t errno = 1;
     printk(KERN_INFO "fibdrv: reading on offset %lld \n", *offset);
-    char *ret = fib_sequence(*offset);
+    char *ret = fib_time_proxy(*offset);
     if (!ret) {
         printk(KERN_INFO "fibdrv: read string failed\n");
-        return -1;
+        return -EFAULT;
     }
     printk(KERN_INFO "fibdrv: read %s\n", ret);
     if (copy_to_user(buf, ret, strlen(ret))) {
         printk(KERN_INFO "fibdrv: copy to user failed\n");
-        errno = -EFAULT;
+        return -EFAULT;
     };
     kfree(ret);
-    return errno;
+    return ktime_to_ns(kt);
 }
 
 /* write operation is skipped */
