@@ -21,7 +21,7 @@ void __bn_add(struct list_head *shorter, struct list_head *longer)
     bn_node *node;
     struct list_head *longer_cur = longer->next;
     list_for_each_entry (node, shorter, list) {
-        node->val += list_entry(longer_cur, bn_node, list)->val + carry;
+        node->val += bn_node_val(longer_cur) + carry;
         carry = node->val / BOUND;
         node->val %= BOUND;
         longer_cur = longer_cur->next;
@@ -30,17 +30,15 @@ void __bn_add(struct list_head *shorter, struct list_head *longer)
         }
     }
     while (longer_cur != longer) {
-        bn_newnode(shorter, list_entry(longer_cur, bn_node, list)->val + carry);
+        bn_newnode(shorter, bn_node_val(longer_cur) + carry);
         node = list_last_entry(shorter, bn_node, list);
         carry = node->val / BOUND;
         node->val %= BOUND;
         longer_cur = longer_cur->next;
     }
     if (carry) {
-        if (list_entry(shorter, bn_head, list)->size >
-            list_entry(longer, bn_head, list)->size) {
-            node = list_entry(node->list.next, bn_node, list);
-            node->val += carry;
+        if (bn_size(shorter) > bn_size(longer)) {
+            bn_node_val(node->list.next) += carry;
         } else
             bn_newnode(shorter, carry);
     }
@@ -62,9 +60,8 @@ void __bn_sub(struct list_head *more, struct list_head *less)
     bn_node *node;
     struct list_head *less_cur = less->next;
     list_for_each_entry (node, more, list) {
-        uint64_t tmp = (less_cur == less)
-                           ? carry
-                           : list_entry(less_cur, bn_node, list)->val + carry;
+        uint64_t tmp =
+            (less_cur == less) ? carry : bn_node_val(less_cur) + carry;
         if (node->val >= tmp) {
             node->val -= tmp;
             carry = 0;
@@ -78,7 +75,7 @@ void __bn_sub(struct list_head *more, struct list_head *less)
     }
     bn_node *last = list_last_entry(more, bn_node, list);
     if (last->val == 0 && likely(!list_is_singular(more))) {
-        list_entry(more, bn_head, list)->size--;
+        bn_size(more)--;
         list_del(&last->list);
         kfree(last);
     }
@@ -96,7 +93,7 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
         node->val = 0;
     }
     while (!list_empty(tmp_b)) {
-        uint64_t bit = list_first_entry(tmp_b, bn_node, list)->val;
+        uint64_t bit = bn_first_val(tmp_b);
         if (bit & 1) {
             bn_add(c, tmp_a);
         }
@@ -155,7 +152,7 @@ void __bn_rshift(struct list_head *head)
     }
     bn_node *last = list_last_entry(head, bn_node, list);
     if (last->val == 0) {
-        list_entry(head, bn_head, list)->size--;
+        bn_size(head)--;
         list_del(&last->list);
         kfree(last);
     }
@@ -167,20 +164,17 @@ char *bn_to_string(struct list_head *head)
         return NULL;
     }
     bn_clean(head);
-    bn_head *bn_list = list_entry(head, bn_head, list);
-    uint64_t first_num = list_last_entry(head, bn_node, list)->val;
-
+    uint64_t first_num = bn_last_val(head);
     size_t ceil = MAX_DIGITS;
     for (size_t floor = 0; floor + 1 != ceil;) {
         size_t *new = first_num >= pow10[(floor + ceil) / 2] ? &floor : &ceil;
         *new = (floor + ceil) / 2;
     }
-    size_t size = (bn_list->size - 1) * MAX_DIGITS + ceil + 1;
+    size_t size = (bn_size(head) - 1) * MAX_DIGITS + ceil + 1;
     char *str = kmalloc(size * sizeof(char), GFP_KERNEL);
     str[--size] = '\0';
     // if the bn represent a zero
-    if (unlikely(list_last_entry(head, bn_node, list)->val == 0 &&
-                 list_is_singular(head))) {
+    if (unlikely(bn_last_val(head) == 0 && list_is_singular(head))) {
         str[--size] = '0';
     } else {
         bn_node *node;
@@ -200,11 +194,9 @@ char *bn_to_string(struct list_head *head)
 
 int bn_cmp(struct list_head *a, struct list_head *b)
 {
-    if (list_entry(a, bn_head, list)->size <
-        list_entry(b, bn_head, list)->size) {
+    if (bn_size(a) < bn_size(b)) {
         return -1;
-    } else if (list_entry(a, bn_head, list)->size >
-               list_entry(b, bn_head, list)->size) {
+    } else if (bn_size(a) > bn_size(b)) {
         return 1;
     }
     // equal in size, compare each node from the end

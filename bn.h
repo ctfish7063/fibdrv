@@ -18,6 +18,11 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+#define bn_size(head) (list_entry(head, bn_head, list)->size)
+#define bn_node_val(node) (list_entry(node, bn_node, list)->val)
+#define bn_first_val(head) (list_first_entry(head, bn_node, list)->val)
+#define bn_last_val(head) (list_last_entry(head, bn_node, list)->val)
+
 // static array to find power of 10 in O(1)
 static const uint64_t pow10[MAX_DIGITS] = {1UL,
                                            10UL,
@@ -84,7 +89,7 @@ static inline void bn_newnode(struct list_head *head, uint64_t val)
     node->val = val;
     INIT_LIST_HEAD(&node->list);
     list_add_tail(&node->list, head);
-    list_entry(head, bn_head, list)->size++;
+    bn_size(head)++;
 }
 
 /**
@@ -152,8 +157,7 @@ static inline void bn_set(struct list_head *head, uint64_t val)
 static inline void bn_copy(struct list_head *dest, struct list_head *target)
 {
     if (list_is_singular(target)) {
-        list_first_entry(dest, bn_node, list)->val =
-            list_first_entry(target, bn_node, list)->val;
+        bn_first_val(dest) = bn_first_val(target);
         return;
     }
     bn_node *node;
@@ -163,7 +167,7 @@ static inline void bn_copy(struct list_head *dest, struct list_head *target)
         if (!node->val && ++size < list_entry(target, bn_head, list)->size)
             continue;
         if (cur != dest) {
-            list_entry(cur, bn_node, list)->val = node->val;
+            bn_node_val(cur) = node->val;
             cur = cur->next;
         } else {
             bn_newnode(dest, node->val);
@@ -193,7 +197,7 @@ static inline void bn_clean(struct list_head *head)
             break;
         list_del(&node->list);
         kfree(node);
-        list_entry(head, bn_head, list)->size--;
+        bn_size(head)--;
     }
 }
 
