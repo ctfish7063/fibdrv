@@ -164,7 +164,7 @@ static inline void bn_copy(struct list_head *dest, struct list_head *target)
     struct list_head *cur = dest->next;
     uint8_t size = 0;
     list_for_each_entry (node, target, list) {
-        if (!node->val && ++size < list_entry(target, bn_head, list)->size)
+        if (!node->val && ++size < bn_size(target))
             continue;
         if (cur != dest) {
             bn_node_val(cur) = node->val;
@@ -177,7 +177,7 @@ static inline void bn_copy(struct list_head *dest, struct list_head *target)
         struct list_head *tmp = cur->next;
         list_del(cur);
         kfree(list_entry(cur, bn_node, list));
-        list_entry(dest, bn_head, list)->size--;
+        bn_size(dest)--;
         cur = tmp;
     }
 }
