@@ -5,9 +5,9 @@
 
 // Use division to replace floating number calculation
 // DIVISOR = 10^6 to prevent multiplication overflow
-#define DIVISOR 1000000
-#define LOG2PHI 694241
-#define LOG2SQRT5 1160964
+#define DIVISOR 100000
+#define LOG2PHI 69424
+#define LOG2SQRT5 116096
 #define uint128_t __uint128_t
 
 

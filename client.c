@@ -8,11 +8,11 @@
 
 #define limit 100
 
-#define DIVISOR 1000000
-#define LOG10PHI 208987
-#define LOG10SQRT5 349485
-#define LOG2PHI 694241
-#define LOG2SQRT5 1160964
+#define DIVISOR 100000
+#define LOG10PHI 20898
+#define LOG10SQRT5 34948
+#define LOG2PHI 69424
+#define LOG2SQRT5 116096
 #define uint128_t __uint128_t
 
 
@@ -66,14 +66,13 @@ int main()
     //     uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
     //     lseek(fd, n, SEEK_SET);
     //     sz = read(fd, buf, sizeof(uint64_t) * list_size);
-    //     // printf("fib[%d] with len : %llu, buf: ", i, list_size);
+    //     // printf("fib[%d] with len : %llu, buf: ", n, list_size);
     //     // for (int j = 0; j < list_size; j++) {
     //     //     printf("%lu ", buf[j]);
     //     // }
     //     char *res = bn_2_string(buf, list_size, n);
     //     // printf("str: %s\n",res);
     //     printf("%d,%lld,%s\n", n, sz, res);
-    //     // free(buf);
     //     buf = NULL;
     // }
 
