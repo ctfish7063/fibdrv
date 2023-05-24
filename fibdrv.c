@@ -28,20 +28,19 @@ static DEFINE_MUTEX(fib_mutex);
 static ktime_t kt;
 
 // naive fibonacci calculation
-static inline char *fib_sequence_naive(long long k)
+static inline size_t fib_sequence_naive(long long k, uint64_t **fib)
 {
-    struct list_head *a = bn_new(0);
-    struct list_head *b = bn_new(1);
-    bn_set(a, 0);
-    bn_set(b, 1);
+    BN_INIT_VAL(a, 1, 0);
+    BN_INIT_VAL(b, 1, 1);
     for (int i = 2; i <= k; i++) {
         bn_add_to_smaller(a, b);
     }
-    char *ret = bn_to_string((k & 1) ? b : a);
+    size_t ret = bn_size((k & 1) ? b : a);
+    *fib = bn_to_array((k & 1) ? b : a);
     bn_free(a);
     bn_free(b);
     return ret;
-};
+}
 
 // fast doubling
 void fast_doubling(struct list_head *fib_n0,
@@ -52,15 +51,11 @@ void fast_doubling(struct list_head *fib_n0,
     // fib(2n+1) = fib(n)^2 + fib(n+1)^2
     // use fib_2n0 to store the result temporarily
     bn_mul(fib_n0, fib_n0, fib_2n1);
-    // bn_print(fib_2n1);
     bn_mul(fib_n1, fib_n1, fib_2n0);
-    // bn_print(fib_2n0);
     bn_add(fib_2n1, fib_2n0);
-    // bn_print(fib_2n1);
     // fib(2n) = fib(n) * (2 * fib(n+1) - fib(n))
     bn_lshift(fib_n1, 1);
     bn_sub(fib_n1, fib_n0);
-    // bn_print(fib_n1);
     bn_mul(fib_n1, fib_n0, fib_2n0);
 }
 
@@ -70,26 +65,23 @@ void fast_doubling(struct list_head *fib_n0,
  * @param k: the index of the fibonacci number
  * @return: the fibonacci number in char*
  */
-static inline char *fib_sequence(long long k)
+static inline size_t fib_sequence(long long k, uint64_t **fib)
 {
     if (unlikely(k < 0)) {
-        return NULL;
+        return 0;
     }
     // return fib[n] without calculation for n <= 2
     if (unlikely(k <= 2)) {
-        char *res = kmalloc(sizeof(char) * 2, GFP_KERNEL);
-        res[0] = !!k + '0';
-        res[1] = '\0';
-        return res;
+        *fib = kmalloc(sizeof(uint64_t) * 2, GFP_KERNEL);
+        (*fib)[0] = !!k;
+        return 1;
     }
     // starting from n = 1, fib[n] = 1, fib [n+1] = 1
     uint8_t count = 63 - CLZ(k);
-    struct list_head *a = bn_new(k / 2);
-    struct list_head *b = bn_new(k / 2 + 1);
-    struct list_head *c = bn_new(k);
-    struct list_head *d = bn_new(k + 1);
-    bn_set(a, 1);
-    bn_set(b, 1);
+    BN_INIT_VAL(a, 0, 1);
+    BN_INIT_VAL(b, 1, 1);
+    BN_INIT(c, 0);
+    BN_INIT(d, 0);
     int n = 1;
     for (uint8_t i = count; i-- > 0;) {
         fast_doubling(a, b, c, d);
@@ -104,7 +96,11 @@ static inline char *fib_sequence(long long k)
             n = 2 * n;
         }
     }
-    char *res = bn_to_string(a);
+    size_t res = bn_size(a);
+    *fib = bn_to_array(a);
+    // for (int i = 0; i < res; i++) {
+    //     printk(KERN_INFO "fibdrv[%llu][%i]: %llu",k, i, (*fib)[i]);
+    // }
     bn_free(a);
     bn_free(b);
     bn_free(c);
@@ -112,12 +108,18 @@ static inline char *fib_sequence(long long k)
     return res;
 }
 
-static char *fib_time_proxy(long long k)
+static size_t fib_time_proxy(long long k, uint64_t **fib)
 {
     kt = ktime_get();
-    char *ret = fib_sequence(k);
+    size_t ret = fib_sequence_naive(k, fib);
     kt = ktime_sub(ktime_get(), kt);
     return ret;
+}
+
+static size_t my_copy_to_user(char *buf, uint64_t *src, size_t size)
+{
+    size_t i = size * sizeof(uint64_t);
+    return copy_to_user(buf, src, i);
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -142,17 +144,18 @@ static ssize_t fib_read(struct file *file,
                         loff_t *offset)
 {
     printk(KERN_INFO "fibdrv: reading on offset %lld \n", *offset);
-    char *ret = fib_time_proxy(*offset);
-    if (!ret) {
-        printk(KERN_INFO "fibdrv: read string failed\n");
+    uint64_t *fib = NULL;
+    size_t fib_size = fib_time_proxy(*offset, &fib);
+    if (!fib) {
+        printk(KERN_INFO "fibdrv: calculation failed\n");
         return -EFAULT;
     }
-    printk(KERN_INFO "fibdrv: read %s\n", ret);
-    if (copy_to_user(buf, ret, strlen(ret))) {
+    printk(KERN_INFO "fibdrv: read\n");
+    if (my_copy_to_user(buf, fib, fib_size)) {
         printk(KERN_INFO "fibdrv: copy to user failed\n");
         return -EFAULT;
     };
-    kfree(ret);
+    kfree(fib);
     return ktime_to_ns(kt);
 }
 
