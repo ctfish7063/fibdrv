@@ -251,8 +251,7 @@ void bn_lshift(struct list_head *head, int bit);
 
 /**
  * __bn_lshift: left shift a bn by bit
- * Number of bits to be shifted is expected to be smaller than 4,
- * since (10^18-1) << 4 < UINT64_MAX
+ * Number of bits to be shifted is expected to be smaller than 64
  * @head: bn to be shifted
  * @bit: number of bits to be shifted
  */
@@ -266,12 +265,19 @@ void __bn_lshift(struct list_head *head, int bit);
 void bn_rshift(struct list_head *head, int bit);
 
 /**
- * __bn_rshift: right shift a bn by a bit
+ * __bn_rshift: right shift a bn by  bit
+ * Number of bits to be shifted is expected to be smaller than 64,
  * @head: bn to be shifted
  * @bit: number of bits to be shifted
  */
 void __bn_rshift(struct list_head *head, int bit);
 
+/**
+ * bn_to_array: convert a bn to an array
+ * the array has the same order with bn_list
+ * @head: bn to be converted
+ * @return: array of uint64_t
+ */
 uint64_t *bn_to_array(struct list_head *head);
 
 /**
