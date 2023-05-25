@@ -29,7 +29,7 @@ char *bn_2_string(uint64_t *head, int head_size, int n)
     }
     for (int i = size; --i >= 0;) {
         uint128_t tmp = 0;
-        for (int j = 0; j < head_size; j++) {
+        for (int j = head_size; --j >= 0;) {
             tmp <<= 64;
             tmp |= head[j];
             head[j] = tmp / 10;
@@ -59,20 +59,22 @@ int main()
         printf("Writing to " FIB_DEV ", returned the sequence %lld\n", sz);
     }
 
-    // for (int i = 0; i <= offset; i++) {
+    // for (int i = 0; i <= 100; i++) {
     //     int n = i;
     //     size_t list_size =
     //         n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
     //     uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
+    //     memset(buf, 0, sizeof(uint64_t) * list_size);
     //     lseek(fd, n, SEEK_SET);
     //     sz = read(fd, buf, sizeof(uint64_t) * list_size);
-    //     // printf("fib[%d] with len : %llu, buf: ", n, list_size);
-    //     // for (int j = 0; j < list_size; j++) {
-    //     //     printf("%lu ", buf[j]);
-    //     // }
+    //     printf("fib[%d] with len : %llu, buf: ", n, list_size);
+    //     for (int j = 0; j < list_size; j++) {
+    //         printf("%lu ", buf[j]);
+    //     }
     //     char *res = bn_2_string(buf, list_size, n);
     //     // printf("str: %s\n",res);
-    //     printf("%d,%lld,%s\n", n, sz, res);
+    //     printf("\n%d,%lld,%s\n", n, sz, res);
+    //     free(res);
     //     buf = NULL;
     // }
 
@@ -80,26 +82,28 @@ int main()
         size_t list_size =
             i > 1 ? (i * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
         uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
+        memset(buf, 0, sizeof(uint64_t) * list_size);
         lseek(fd, i, SEEK_SET);
         sz = read(fd, buf, sizeof(uint64_t) * list_size);
         char *res = bn_2_string(buf, list_size, i);
         printf("Reading from " FIB_DEV
                " at offset %d, returned the sequence %s.\n",
                i, res);
-        buf = NULL;
+        free(res);
     }
 
     for (int i = offset; i >= 0; i--) {
         size_t list_size =
             i > 1 ? (i * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
         uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
+        memset(buf, 0, sizeof(uint64_t) * list_size);
         lseek(fd, i, SEEK_SET);
         sz = read(fd, buf, sizeof(uint64_t) * list_size);
         char *res = bn_2_string(buf, list_size, i);
         printf("Reading from " FIB_DEV
                " at offset %d, returned the sequence %s.\n",
                i, res);
-        buf = NULL;
+        free(res);
     }
 
     close(fd);

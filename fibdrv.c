@@ -118,7 +118,13 @@ static size_t fib_time_proxy(long long k, uint64_t **fib)
 
 static size_t my_copy_to_user(char *buf, uint64_t *src, size_t size)
 {
-    size_t i = size * sizeof(uint64_t);
+    size_t lbytes = src[size - 1] ? CLZ(src[size - 1]) >> 3 : 7;
+    size_t i = size * sizeof(uint64_t) - lbytes;
+    printk(KERN_INFO "fibdrv: total %zu bytes, copy_to_user %zu bytes",
+           size * sizeof(uint64_t), i);
+    for (int j = 0; j < size; j++) {
+        printk(KERN_INFO "fibdrv[%i]: %llu", j, src[j]);
+    }
     return copy_to_user(buf, src, i);
 }
 

@@ -177,7 +177,9 @@ uint64_t *bn_to_array(struct list_head *head)
     uint64_t *res = kmalloc(sizeof(uint64_t) * bn_size(head), GFP_KERNEL);
     int i = 0;
     bn_node *node;
-    list_for_each_entry_reverse(node, head, list) { res[i++] = node->val; }
+    list_for_each_entry (node, head, list) {
+        res[i++] = node->val;
+    }
     return res;
 }
 
