@@ -86,18 +86,18 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
     for (uint8_t i = count; i-- > 0;) {
         fast_doubling(a, b, c, d);
         if (k & (1LL << i)) {
-            bn_copy(a, d);
             bn_add(c, d);
-            bn_copy(b, c);
+            bn_swap(&a, &d);
+            bn_swap(&b, &c);
             n = 2 * n + 1;
         } else {
-            bn_copy(a, c);
-            bn_copy(b, d);
+            bn_swap(&a, &c);
+            bn_swap(&b, &d);
             n = 2 * n;
         }
     }
-    size_t res = bn_size(a);
     *fib = bn_to_array(a);
+    size_t res = bn_size(a);
     // for (int i = 0; i < res; i++) {
     //     printk(KERN_INFO "fibdrv[%llu][%i]: %llu",k, i, (*fib)[i]);
     // }

@@ -131,6 +131,18 @@ static inline void bn_set(struct list_head *head, uint64_t val)
 }
 
 /**
+ * bn_swap: swap two bn list
+ * @a: address of first bn list
+ * @b: address of second bn list
+ */
+static inline void bn_swap(struct list_head **a, struct list_head **b)
+{
+    struct list_head *tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+/**
  * bn_copy: copy a bn list to another
  * @dest: destination bn list to be copied to
  * @target: target bn list to be copied from

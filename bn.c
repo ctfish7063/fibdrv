@@ -91,6 +91,10 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
     list_for_each_entry (node, c, list) {
         node->val = 0;
     }
+    // append c to match size of b
+    for (int diff = bn_size(b) - bn_size(c); diff > 0; diff--) {
+        bn_newnode(c, 0);
+    }
     bn_node *node_a, *node_b;
     struct list_head *base = c->next;
     list_for_each_entry (node_a, a, list) {
