@@ -20,6 +20,13 @@ MODULE_VERSION("0.1");
  */
 #define MAX_LENGTH 10000
 #define CLZ(x) __builtin_clzll(x)
+#define XOR_PTR(a, b) (void *) ((uintptr_t)(a) ^ (uintptr_t)(b))
+#define XOR_SWAP(a, b)     \
+    do {                   \
+        a = XOR_PTR(a, b); \
+        b = XOR_PTR(a, b); \
+        a = XOR_PTR(a, b); \
+    } while (0)
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
@@ -87,12 +94,12 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
         fast_doubling(a, b, c, d);
         if (k & (1LL << i)) {
             bn_add(c, d);
-            bn_swap(&a, &d);
-            bn_swap(&b, &c);
+            XOR_SWAP(a, d);
+            XOR_SWAP(b, c);
             n = 2 * n + 1;
         } else {
-            bn_swap(&a, &c);
-            bn_swap(&b, &d);
+            XOR_SWAP(a, c);
+            XOR_SWAP(b, d);
             n = 2 * n;
         }
     }
