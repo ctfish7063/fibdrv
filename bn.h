@@ -109,7 +109,8 @@ static inline void bn_free(struct list_head *head)
  */
 static inline struct list_head *bn_new(size_t n)
 {
-    unsigned int list_len = n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR + 1 : 1;
+    unsigned int list_len =
+        n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
     struct list_head *head = bn_alloc();
     for (; list_len; list_len--) {
         bn_newnode(head, 0);
