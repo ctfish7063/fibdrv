@@ -37,13 +37,23 @@ static ktime_t kt;
 // naive fibonacci calculation
 static inline size_t fib_sequence_naive(long long k, uint64_t **fib)
 {
+    if (unlikely(k < 0)) {
+        return 0;
+    }
+    // return fib[n] without calculation for n <= 2
+    if (unlikely(k <= 2)) {
+        *fib = kmalloc(sizeof(uint64_t), GFP_KERNEL);
+        (*fib)[0] = !!k;
+        return 1;
+    }
     BN_INIT_VAL(a, 1, 0);
     BN_INIT_VAL(b, 1, 1);
     for (int i = 2; i <= k; i++) {
-        bn_add_to_smaller(a, b);
+        bn_add(a, b);
+        XOR_SWAP(a, b);
     }
-    size_t ret = bn_size((k & 1) ? b : a);
-    *fib = bn_to_array((k & 1) ? b : a);
+    *fib = bn_to_array(b);
+    size_t ret = bn_size(b);
     bn_free(a);
     bn_free(b);
     return ret;
