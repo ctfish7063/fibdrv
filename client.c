@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define limit 100
+#define limit 10000
 
 #define DIVISOR 100000
 #define LOG10PHI 20898
@@ -37,7 +37,6 @@ char *bn_2_string(uint64_t *head, int head_size, int n)
         }
         res[i] = tmp + '0';
     }
-    free(head);
     return res;
 }
 
@@ -90,6 +89,7 @@ int main()
                " at offset %d, returned the sequence %s.\n",
                i, res);
         free(res);
+        free(buf);
     }
 
     for (int i = offset; i >= 0; i--) {
@@ -104,6 +104,7 @@ int main()
                " at offset %d, returned the sequence %s.\n",
                i, res);
         free(res);
+        free(buf);
     }
 
     close(fd);
