@@ -111,6 +111,9 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
             bn_node_val(cur) += carry;
             carry = n_carry;
             cur = cur->next;
+            if (cur == c) {
+                break;
+            }
         }
         while (carry) {
             if (cur == c) {
