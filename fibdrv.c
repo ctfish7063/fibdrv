@@ -60,10 +60,10 @@ static inline size_t fib_sequence_naive(long long k, uint64_t **fib)
 }
 
 // fast doubling
-void fast_doubling(struct list_head *fib_n0,
-                   struct list_head *fib_n1,
-                   struct list_head *fib_2n0,
-                   struct list_head *fib_2n1)
+static inline void fast_doubling(struct list_head *fib_n0,
+                                 struct list_head *fib_n1,
+                                 struct list_head *fib_2n0,
+                                 struct list_head *fib_2n1)
 {
     // fib(2n+1) = fib(n)^2 + fib(n+1)^2
     // use fib_2n0 to store the result temporarily
