@@ -89,7 +89,7 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
     }
     // return fib[n] without calculation for n <= 2
     if (unlikely(k <= 2)) {
-        *fib = kmalloc(sizeof(uint64_t) * 2, GFP_KERNEL);
+        *fib = kmalloc(sizeof(uint64_t), GFP_KERNEL);
         (*fib)[0] = !!k;
         return 1;
     }
@@ -128,7 +128,7 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
 static size_t fib_time_proxy(long long k, uint64_t **fib)
 {
     kt = ktime_get();
-    size_t ret = fib_sequence_naive(k, fib);
+    size_t ret = fib_sequence(k, fib);
     kt = ktime_sub(ktime_get(), kt);
     return ret;
 }
