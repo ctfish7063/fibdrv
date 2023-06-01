@@ -6,12 +6,10 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+// #include <sys/time.h>
 
-#define limit 100
-
+#define limit 10000
 #define DIVISOR 100000
-#define LOG10PHI 20898
-#define LOG10SQRT5 34948
 #define LOG2PHI 69424
 #define LOG2SQRT5 116096
 #define uint128_t __uint128_t
@@ -43,44 +41,37 @@ char *bn_2_string(uint64_t *head, int head_size, uint64_t n)
     return res;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     long long sz;
+    // struct timespec start, end;
 
     char write_buf[] = "testing writing";
     int offset = limit; /* TODO: try test something bigger than the limit */
-
     int fd = open(FIB_DEV, O_RDWR);
     if (fd < 0) {
         perror("Failed to open character device");
         exit(1);
     }
-
     for (int i = 0; i <= offset; i++) {
         sz = write(fd, write_buf, strlen(write_buf));
         printf("Writing to " FIB_DEV ", returned the sequence %lld\n", sz);
     }
-
+    if (argc > 1)
+        sz = write(fd, argv[1], strlen(argv[1]));
     // for (uint64_t i = 0; i <= 100; i++) {
-    // uint64_t n = 1000000;
-    // size_t list_size =
-    //     n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
-    // printf("malloc size: %d\n", list_size);
-    // uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
-    // memset(buf, 0, sizeof(uint64_t) * list_size);
-    // lseek(fd, n, SEEK_SET);
-    // printf("lseek to %d\n", n);
-    // sz = read(fd, buf, sizeof(uint64_t) * list_size);
-    // // printf("fib[%d] with len : %llu, buf: ", n, list_size);
-    // // for (int j = 0; j < list_size; j++) {
-    // //     printf("%lu ", buf[j]);
-    // // }
-    // printf("read\n");
-    // char *res = bn_2_string(buf, list_size, n);
-    // // printf("str: %s\n",res);
-    // printf("\n%d,%lld,%s\n", n, sz, res);
-    // free(res);
-    // buf = NULL;
+    //     uint64_t n = i;
+    //     size_t list_size =
+    //         n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
+    //     uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
+    //     memset(buf, 0, sizeof(uint64_t) * list_size);
+    //     lseek(fd, n, SEEK_SET);
+    //     sz = read(fd, buf, sizeof(uint64_t) * list_size);
+    //     char *res = bn_2_string(buf, list_size, n);
+    //     // printf("\n%d,%lld,%s\n", n, sz, res);
+    //     printf("%d %lld\n", n, sz);
+    //     // free(res);
+    //     free(buf);
     // }
 
     for (int i = 0; i <= offset; i++) {

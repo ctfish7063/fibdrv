@@ -33,6 +33,7 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 static ktime_t kt;
+static uint8_t mode = 1;
 
 // naive fibonacci calculation
 static inline size_t fib_sequence_naive(long long k, uint64_t **fib)
@@ -127,9 +128,18 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
 
 static size_t fib_time_proxy(long long k, uint64_t **fib)
 {
-    kt = ktime_get();
-    size_t ret = fib_sequence(k, fib);
-    kt = ktime_sub(ktime_get(), kt);
+    size_t ret = 0;
+    if (mode) {
+        printk(KERN_INFO "fibdrv: fast doubling mode");
+        kt = ktime_get();
+        ret = fib_sequence(k, fib);
+        kt = ktime_sub(ktime_get(), kt);
+    } else {
+        printk(KERN_INFO "fibdrv: naive mode");
+        kt = ktime_get();
+        ret = fib_sequence_naive(k, fib);
+        kt = ktime_sub(ktime_get(), kt);
+    }
     return ret;
 }
 
@@ -189,6 +199,15 @@ static ssize_t fib_write(struct file *file,
                          size_t size,
                          loff_t *offset)
 {
+    printk(KERN_INFO "fibdrv: writing on offset %lld \n", *offset);
+    char *kbuf = kmalloc(size, GFP_KERNEL);
+    if (copy_from_user(kbuf, buf, size)) {
+        printk(KERN_INFO "fibdrv: copy from user failed\n");
+        return -EFAULT;
+    };
+    printk(KERN_INFO "fibdrv: copy from user success\n");
+    mode = !!(int) (kbuf[0] - 'n');
+    kfree(kbuf);
     return 1;
 }
 
