@@ -208,7 +208,7 @@ static ssize_t fib_write(struct file *file,
     printk(KERN_INFO "fibdrv: copy from user success\n");
     mode = !!(int) (kbuf[0] - 'n');
     kfree(kbuf);
-    return 1;
+    return mode;
 }
 
 static loff_t fib_device_lseek(struct file *file, loff_t offset, int orig)

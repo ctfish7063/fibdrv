@@ -25,6 +25,9 @@ load:
 unload:
 	sudo rmmod $(TARGET_MODULE) || true >/dev/null
 
+test: test.c
+	$(CC) -o $@ $^
+
 client: client.c
 	$(CC) -o $@ $^
 
@@ -40,3 +43,13 @@ check: all
 	$(MAKE) unload
 	@diff -u out scripts/expected.txt && $(call pass)
 	@scripts/verify.py
+
+plot: all
+	$(MAKE) unload
+	$(MAKE) load
+	@rm -f fast.txt naive.txt perf.png
+	sudo ./test > fast.txt
+	sudo ./test n > naive.txt
+	$(MAKE) unload
+	@gnuplot plot.gp
+	@eog perf.png
