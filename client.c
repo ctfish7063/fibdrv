@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,7 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define limit 10000
+#define limit 100
 
 #define DIVISOR 100000
 #define LOG10PHI 20898
@@ -18,9 +19,11 @@
 
 #define FIB_DEV "/dev/fibonacci"
 
-char *bn_2_string(uint64_t *head, int head_size, int n)
+char *bn_2_string(uint64_t *head, int head_size, uint64_t n)
 {
-    size_t size = n > 1 ? (n * LOG10PHI - LOG10SQRT5) / DIVISOR + 2 : 2;
+    // log10(fib(n)) = nlog10(phi) - log10(5)/2
+    double logfib = n * 0.20898764025 - 0.34948500216;
+    size_t size = n > 1 ? (size_t) logfib + 2 : 2;
     char *res = malloc(sizeof(char) * size);
     res[--size] = '\0';
     if (n < 3) {
@@ -58,28 +61,31 @@ int main()
         printf("Writing to " FIB_DEV ", returned the sequence %lld\n", sz);
     }
 
-    // for (int i = 0; i <= 100; i++) {
-    //     int n = i;
-    //     size_t list_size =
-    //         n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
-    //     uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
-    //     memset(buf, 0, sizeof(uint64_t) * list_size);
-    //     lseek(fd, n, SEEK_SET);
-    //     sz = read(fd, buf, sizeof(uint64_t) * list_size);
-    //     printf("fib[%d] with len : %llu, buf: ", n, list_size);
-    //     for (int j = 0; j < list_size; j++) {
-    //         printf("%lu ", buf[j]);
-    //     }
-    //     char *res = bn_2_string(buf, list_size, n);
-    //     // printf("str: %s\n",res);
-    //     printf("\n%d,%lld,%s\n", n, sz, res);
-    //     free(res);
-    //     buf = NULL;
+    // for (uint64_t i = 0; i <= 100; i++) {
+    // uint64_t n = 1000000;
+    // size_t list_size =
+    //     n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
+    // printf("malloc size: %d\n", list_size);
+    // uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
+    // memset(buf, 0, sizeof(uint64_t) * list_size);
+    // lseek(fd, n, SEEK_SET);
+    // printf("lseek to %d\n", n);
+    // sz = read(fd, buf, sizeof(uint64_t) * list_size);
+    // // printf("fib[%d] with len : %llu, buf: ", n, list_size);
+    // // for (int j = 0; j < list_size; j++) {
+    // //     printf("%lu ", buf[j]);
+    // // }
+    // printf("read\n");
+    // char *res = bn_2_string(buf, list_size, n);
+    // // printf("str: %s\n",res);
+    // printf("\n%d,%lld,%s\n", n, sz, res);
+    // free(res);
+    // buf = NULL;
     // }
 
     for (int i = 0; i <= offset; i++) {
-        size_t list_size =
-            i > 1 ? (i * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
+        uint64_t n = ((uint64_t) i * LOG2PHI - LOG2SQRT5) / DIVISOR / 64;
+        size_t list_size = i > 1 ? n + 1 : 1;
         uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
         memset(buf, 0, sizeof(uint64_t) * list_size);
         lseek(fd, i, SEEK_SET);
@@ -93,8 +99,8 @@ int main()
     }
 
     for (int i = offset; i >= 0; i--) {
-        size_t list_size =
-            i > 1 ? (i * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
+        uint64_t n = ((uint64_t) i * LOG2PHI - LOG2SQRT5) / DIVISOR / 64;
+        size_t list_size = i > 1 ? n + 1 : 1;
         uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
         memset(buf, 0, sizeof(uint64_t) * list_size);
         lseek(fd, i, SEEK_SET);

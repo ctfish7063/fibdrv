@@ -18,7 +18,7 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 10000
+#define MAX_LENGTH 1000000
 #define CLZ(x) __builtin_clzll(x)
 #define XOR_PTR(a, b) (void *) ((uintptr_t)(a) ^ (uintptr_t)(b))
 #define XOR_SWAP(a, b)     \
@@ -139,9 +139,9 @@ static size_t my_copy_to_user(char *buf, uint64_t *src, size_t size)
     size_t i = size * sizeof(uint64_t) - lbytes;
     printk(KERN_INFO "fibdrv: total %zu bytes, copy_to_user %zu bytes",
            size * sizeof(uint64_t), i);
-    for (int j = 0; j < size; j++) {
-        printk(KERN_INFO "fibdrv[%i]: %llu", j, src[j]);
-    }
+    // for (int j = 0; j < size; j++) {
+    //     printk(KERN_INFO "fibdrv[%i]: %llu", j, src[j]);
+    // }
     return copy_to_user(buf, src, i);
 }
 
@@ -178,6 +178,7 @@ static ssize_t fib_read(struct file *file,
         printk(KERN_INFO "fibdrv: copy to user failed\n");
         return -EFAULT;
     };
+    printk(KERN_INFO "fibdrv: copy to user success\n");
     kfree(fib);
     return ktime_to_ns(kt);
 }
