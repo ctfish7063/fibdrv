@@ -51,5 +51,5 @@ plot: all
 	sudo ./test > fast.txt
 	sudo ./test n > naive.txt
 	$(MAKE) unload
-	@gnuplot plot.gp
+	@gnuplot scripts/plot.gp
 	@eog perf.png
