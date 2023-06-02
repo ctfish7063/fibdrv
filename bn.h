@@ -3,45 +3,34 @@
 
 #include <linux/slab.h>
 
-// Each node of bn list can store a value within 10^18
-// BOUND = 10^18
-#define BOUND 1000000000000000000UL
-#define MAX_DIGITS 18
-
 // Use division to replace floating number calculation
 // DIVISOR = 10^6 to prevent multiplication overflow
-#define DIVISOR 1000000
-#define LOG10PHI 208987
-#define LOG10SQRT5 349485
-#define LOG2_10 3321928
+#define DIVISOR 100000
+#define LOG2PHI 69424
+#define LOG2SQRT5 116096
+#define uint128_t __uint128_t
+
 
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+#define BN_INIT(name, size) struct list_head *name = bn_new(size)
+#define BN_INIT_VAL(name, size, val)       \
+    struct list_head *name = bn_new(size); \
+    bn_set(name, val)
 #define bn_size(head) (list_entry(head, bn_head, list)->size)
 #define bn_node_val(node) (list_entry(node, bn_node, list)->val)
 #define bn_first_val(head) (list_first_entry(head, bn_node, list)->val)
 #define bn_last_val(head) (list_last_entry(head, bn_node, list)->val)
+#define bn_pop(head)                                          \
+    do {                                                      \
+        bn_node *node = list_last_entry(head, bn_node, list); \
+        list_del(&node->list);                                \
+        kfree(node);                                          \
+        bn_size(head)--;                                      \
+    } while (0)
 
-// static array to find power of 10 in O(1)
-static const uint64_t pow10[MAX_DIGITS] = {1UL,
-                                           10UL,
-                                           100UL,
-                                           1000UL,
-                                           10000UL,
-                                           100000UL,
-                                           1000000UL,
-                                           10000000UL,
-                                           100000000UL,
-                                           1000000000UL,
-                                           10000000000UL,
-                                           100000000000UL,
-                                           1000000000000UL,
-                                           10000000000000UL,
-                                           100000000000000UL,
-                                           1000000000000000UL,
-                                           10000000000000000UL,
-                                           100000000000000000UL};
+
 
 /**
  * bn_head - store the head of bn list
@@ -121,7 +110,7 @@ static inline void bn_free(struct list_head *head)
 static inline struct list_head *bn_new(size_t n)
 {
     unsigned int list_len =
-        n > 1 ? (n * LOG10PHI - LOG10SQRT5) / DIVISOR / MAX_DIGITS + 1 : 1;
+        n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
     struct list_head *head = bn_alloc();
     for (; list_len; list_len--) {
         bn_newnode(head, 0);
@@ -138,15 +127,7 @@ static inline struct list_head *bn_new(size_t n)
  */
 static inline void bn_set(struct list_head *head, uint64_t val)
 {
-    bn_node *node;
-    uint64_t value = val;
-    list_for_each_entry (node, head, list) {
-        node->val = value % BOUND;
-        value /= BOUND;
-    }
-    if (value) {
-        bn_newnode(head, value);
-    }
+    bn_first_val(head) = val;
 }
 
 /**
@@ -172,6 +153,7 @@ static inline void bn_copy(struct list_head *dest, struct list_head *target)
         } else {
             bn_newnode(dest, node->val);
         }
+        size++;
     }
     while (cur != dest) {
         struct list_head *tmp = cur->next;
@@ -270,8 +252,7 @@ void bn_lshift(struct list_head *head, int bit);
 
 /**
  * __bn_lshift: left shift a bn by bit
- * Number of bits to be shifted is expected to be smaller than 4,
- * since (10^18-1) << 4 < UINT64_MAX
+ * Number of bits to be shifted is expected to be smaller than 64
  * @head: bn to be shifted
  * @bit: number of bits to be shifted
  */
@@ -285,18 +266,20 @@ void __bn_lshift(struct list_head *head, int bit);
 void bn_rshift(struct list_head *head, int bit);
 
 /**
- * __bn_rshift: right shift a bn by a bit
+ * __bn_rshift: right shift a bn by  bit
+ * Number of bits to be shifted is expected to be smaller than 64,
  * @head: bn to be shifted
  * @bit: number of bits to be shifted
  */
-void __bn_rshift(struct list_head *head);
+void __bn_rshift(struct list_head *head, int bit);
 
 /**
- * bn_to_string: convert a bn list to string
- * @list: head of the bn list
- * @return: string representation of the bn list
+ * bn_to_array: convert a bn to an array
+ * the array has the same order with bn_list
+ * @head: bn to be converted
+ * @return: array of uint64_t
  */
-char *bn_to_string(struct list_head *list);
+uint64_t *bn_to_array(struct list_head *head);
 
 /**
  * bn_compare: compare two bn lists

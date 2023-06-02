@@ -18,49 +18,62 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 10000
+#define MAX_LENGTH 1000000
 #define CLZ(x) __builtin_clzll(x)
+#define XOR_PTR(a, b) (void *) ((uintptr_t)(a) ^ (uintptr_t)(b))
+#define XOR_SWAP(a, b)     \
+    do {                   \
+        a = XOR_PTR(a, b); \
+        b = XOR_PTR(a, b); \
+        a = XOR_PTR(a, b); \
+    } while (0)
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 static ktime_t kt;
+static uint8_t mode = 1;
 
 // naive fibonacci calculation
-static inline char *fib_sequence_naive(long long k)
+static inline size_t fib_sequence_naive(long long k, uint64_t **fib)
 {
-    struct list_head *a = bn_new(0);
-    struct list_head *b = bn_new(1);
-    bn_set(a, 0);
-    bn_set(b, 1);
-    for (int i = 2; i <= k; i++) {
-        bn_add_to_smaller(a, b);
+    if (unlikely(k < 0)) {
+        return 0;
     }
-    char *ret = bn_to_string((k & 1) ? b : a);
+    // return fib[n] without calculation for n <= 2
+    if (unlikely(k <= 2)) {
+        *fib = kmalloc(sizeof(uint64_t), GFP_KERNEL);
+        (*fib)[0] = !!k;
+        return 1;
+    }
+    BN_INIT_VAL(a, 1, 0);
+    BN_INIT_VAL(b, 1, 1);
+    for (int i = 2; i <= k; i++) {
+        bn_add(a, b);
+        XOR_SWAP(a, b);
+    }
+    *fib = bn_to_array(b);
+    size_t ret = bn_size(b);
     bn_free(a);
     bn_free(b);
     return ret;
-};
+}
 
 // fast doubling
-void fast_doubling(struct list_head *fib_n0,
-                   struct list_head *fib_n1,
-                   struct list_head *fib_2n0,
-                   struct list_head *fib_2n1)
+static inline void fast_doubling(struct list_head *fib_n0,
+                                 struct list_head *fib_n1,
+                                 struct list_head *fib_2n0,
+                                 struct list_head *fib_2n1)
 {
     // fib(2n+1) = fib(n)^2 + fib(n+1)^2
     // use fib_2n0 to store the result temporarily
     bn_mul(fib_n0, fib_n0, fib_2n1);
-    // bn_print(fib_2n1);
     bn_mul(fib_n1, fib_n1, fib_2n0);
-    // bn_print(fib_2n0);
     bn_add(fib_2n1, fib_2n0);
-    // bn_print(fib_2n1);
     // fib(2n) = fib(n) * (2 * fib(n+1) - fib(n))
     bn_lshift(fib_n1, 1);
     bn_sub(fib_n1, fib_n0);
-    // bn_print(fib_n1);
     bn_mul(fib_n1, fib_n0, fib_2n0);
 }
 
@@ -70,41 +83,42 @@ void fast_doubling(struct list_head *fib_n0,
  * @param k: the index of the fibonacci number
  * @return: the fibonacci number in char*
  */
-static inline char *fib_sequence(long long k)
+static inline size_t fib_sequence(long long k, uint64_t **fib)
 {
     if (unlikely(k < 0)) {
-        return NULL;
+        return 0;
     }
     // return fib[n] without calculation for n <= 2
     if (unlikely(k <= 2)) {
-        char *res = kmalloc(sizeof(char) * 2, GFP_KERNEL);
-        res[0] = !!k + '0';
-        res[1] = '\0';
-        return res;
+        *fib = kmalloc(sizeof(uint64_t), GFP_KERNEL);
+        (*fib)[0] = !!k;
+        return 1;
     }
     // starting from n = 1, fib[n] = 1, fib [n+1] = 1
     uint8_t count = 63 - CLZ(k);
-    struct list_head *a = bn_new(k / 2);
-    struct list_head *b = bn_new(k / 2 + 1);
-    struct list_head *c = bn_new(k);
-    struct list_head *d = bn_new(k + 1);
-    bn_set(a, 1);
-    bn_set(b, 1);
+    BN_INIT_VAL(a, 0, 1);
+    BN_INIT_VAL(b, 1, 1);
+    BN_INIT(c, 0);
+    BN_INIT(d, 0);
     int n = 1;
     for (uint8_t i = count; i-- > 0;) {
         fast_doubling(a, b, c, d);
         if (k & (1LL << i)) {
-            bn_copy(a, d);
             bn_add(c, d);
-            bn_copy(b, c);
+            XOR_SWAP(a, d);
+            XOR_SWAP(b, c);
             n = 2 * n + 1;
         } else {
-            bn_copy(a, c);
-            bn_copy(b, d);
+            XOR_SWAP(a, c);
+            XOR_SWAP(b, d);
             n = 2 * n;
         }
     }
-    char *res = bn_to_string(a);
+    *fib = bn_to_array(a);
+    size_t res = bn_size(a);
+    // for (int i = 0; i < res; i++) {
+    //     printk(KERN_INFO "fibdrv[%llu][%i]: %llu",k, i, (*fib)[i]);
+    // }
     bn_free(a);
     bn_free(b);
     bn_free(c);
@@ -112,12 +126,33 @@ static inline char *fib_sequence(long long k)
     return res;
 }
 
-static char *fib_time_proxy(long long k)
+static size_t fib_time_proxy(long long k, uint64_t **fib)
 {
-    kt = ktime_get();
-    char *ret = fib_sequence(k);
-    kt = ktime_sub(ktime_get(), kt);
+    size_t ret = 0;
+    if (mode) {
+        printk(KERN_INFO "fibdrv: fast doubling mode");
+        kt = ktime_get();
+        ret = fib_sequence(k, fib);
+        kt = ktime_sub(ktime_get(), kt);
+    } else {
+        printk(KERN_INFO "fibdrv: naive mode");
+        kt = ktime_get();
+        ret = fib_sequence_naive(k, fib);
+        kt = ktime_sub(ktime_get(), kt);
+    }
     return ret;
+}
+
+static size_t my_copy_to_user(char *buf, uint64_t *src, size_t size)
+{
+    size_t lbytes = src[size - 1] ? CLZ(src[size - 1]) >> 3 : 7;
+    size_t i = size * sizeof(uint64_t) - lbytes;
+    printk(KERN_INFO "fibdrv: total %zu bytes, copy_to_user %zu bytes",
+           size * sizeof(uint64_t), i);
+    // for (int j = 0; j < size; j++) {
+    //     printk(KERN_INFO "fibdrv[%i]: %llu", j, src[j]);
+    // }
+    return copy_to_user(buf, src, i);
 }
 
 static int fib_open(struct inode *inode, struct file *file)
@@ -142,17 +177,19 @@ static ssize_t fib_read(struct file *file,
                         loff_t *offset)
 {
     printk(KERN_INFO "fibdrv: reading on offset %lld \n", *offset);
-    char *ret = fib_time_proxy(*offset);
-    if (!ret) {
-        printk(KERN_INFO "fibdrv: read string failed\n");
+    uint64_t *fib = NULL;
+    size_t fib_size = fib_time_proxy(*offset, &fib);
+    if (!fib) {
+        printk(KERN_INFO "fibdrv: calculation failed\n");
         return -EFAULT;
     }
-    printk(KERN_INFO "fibdrv: read %s\n", ret);
-    if (copy_to_user(buf, ret, strlen(ret))) {
+    printk(KERN_INFO "fibdrv: read\n");
+    if (my_copy_to_user(buf, fib, fib_size)) {
         printk(KERN_INFO "fibdrv: copy to user failed\n");
         return -EFAULT;
     };
-    kfree(ret);
+    printk(KERN_INFO "fibdrv: copy to user success\n");
+    kfree(fib);
     return ktime_to_ns(kt);
 }
 
@@ -162,7 +199,16 @@ static ssize_t fib_write(struct file *file,
                          size_t size,
                          loff_t *offset)
 {
-    return 1;
+    printk(KERN_INFO "fibdrv: writing on offset %lld \n", *offset);
+    char *kbuf = kmalloc(size, GFP_KERNEL);
+    if (copy_from_user(kbuf, buf, size)) {
+        printk(KERN_INFO "fibdrv: copy from user failed\n");
+        return -EFAULT;
+    };
+    printk(KERN_INFO "fibdrv: copy from user success\n");
+    mode = !!(int) (kbuf[0] - 'n');
+    kfree(kbuf);
+    return mode;
 }
 
 static loff_t fib_device_lseek(struct file *file, loff_t offset, int orig)

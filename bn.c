@@ -21,26 +21,29 @@ void __bn_add(struct list_head *shorter, struct list_head *longer)
     bn_node *node;
     struct list_head *longer_cur = longer->next;
     list_for_each_entry (node, shorter, list) {
+        uint64_t tmp = node->val;
         node->val += bn_node_val(longer_cur) + carry;
-        carry = node->val / BOUND;
-        node->val %= BOUND;
+        carry = U64_MAX - tmp >= bn_node_val(longer_cur) + carry ? 0 : 1;
         longer_cur = longer_cur->next;
         if (longer_cur == longer) {
             break;
         }
     }
     while (longer_cur != longer) {
+        uint64_t tmp = bn_node_val(longer_cur);
         bn_newnode(shorter, bn_node_val(longer_cur) + carry);
-        node = list_last_entry(shorter, bn_node, list);
-        carry = node->val / BOUND;
-        node->val %= BOUND;
+        carry = U64_MAX - tmp >= carry ? 0 : 1;
         longer_cur = longer_cur->next;
     }
-    if (carry) {
+    while (carry) {
         if (bn_size(shorter) > bn_size(longer)) {
+            uint64_t tmp = bn_node_val(node->list.next);
             bn_node_val(node->list.next) += carry;
-        } else
+            carry = U64_MAX - tmp >= carry ? 0 : 1;
+        } else {
             bn_newnode(shorter, carry);
+            break;
+        }
     }
 }
 
@@ -62,11 +65,11 @@ void __bn_sub(struct list_head *more, struct list_head *less)
     list_for_each_entry (node, more, list) {
         uint64_t tmp =
             (less_cur == less) ? carry : bn_node_val(less_cur) + carry;
-        if (node->val >= tmp) {
+        if (node->val >= tmp && likely(bn_node_val(less_cur) != U64_MAX - 1)) {
             node->val -= tmp;
             carry = 0;
         } else {
-            node->val += BOUND - tmp;
+            node->val += (U64_MAX - tmp) + 1;
             carry = 1;
         }
         if (less_cur != less) {
@@ -83,49 +86,67 @@ void __bn_sub(struct list_head *more, struct list_head *less)
 
 void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
 {
-    struct list_head *tmp_a = bn_new(0);
-    struct list_head *tmp_b = bn_new(0);
-    bn_copy(tmp_a, a);
-    bn_copy(tmp_b, b);
     bn_node *node;
     // zeroing c
     list_for_each_entry (node, c, list) {
         node->val = 0;
     }
-    while (!list_empty(tmp_b)) {
-        uint64_t bit = bn_first_val(tmp_b);
-        if (bit & 1) {
-            bn_add(c, tmp_a);
-        }
-        bn_rshift(tmp_b, 1);
-        bn_lshift(tmp_a, 1);
+    // append c to match size of b
+    for (int diff = bn_size(b) - bn_size(c); diff > 0; diff--) {
+        bn_newnode(c, 0);
     }
-    bn_free(tmp_a);
-    bn_free(tmp_b);
+    bn_node *node_a, *node_b;
+    struct list_head *base = c->next;
+    list_for_each_entry (node_a, a, list) {
+        uint64_t carry = 0;
+        struct list_head *cur = base;
+        list_for_each_entry (node_b, b, list) {
+            uint128_t tmp = (uint128_t) node_b->val * (uint128_t) node_a->val;
+            uint64_t n_carry = tmp >> 64;
+            if (U64_MAX - bn_node_val(cur) < tmp << 64 >> 64)
+                n_carry++;
+            bn_node_val(cur) += tmp;
+            if (U64_MAX - bn_node_val(cur) < carry)
+                n_carry++;
+            bn_node_val(cur) += carry;
+            carry = n_carry;
+            cur = cur->next;
+            if (cur == c) {
+                break;
+            }
+        }
+        while (carry) {
+            if (cur == c) {
+                bn_newnode(c, carry);
+                break;
+            }
+            uint64_t tmp = bn_node_val(cur);
+            bn_node_val(cur) += carry;
+            carry = U64_MAX - tmp >= carry ? 0 : 1;
+            cur = cur->next;
+        }
+        base = base->next;
+    }
 }
 
 void bn_lshift(struct list_head *head, int bit)
 {
-    if (bit <= 4) {
-        __bn_lshift(head, bit);
-    } else {
-        while (bit > 4) {
-            __bn_lshift(head, 4);
-            bit -= 4;
-        }
-        __bn_lshift(head, bit);
+    int tmp = bit;
+    for (; tmp > 64; tmp -= 63) {
+        __bn_lshift(head, 63);
     }
+    __bn_lshift(head, tmp);
 }
 
 void __bn_lshift(struct list_head *head, int bit)
 {
-    int carry = 0;
+    uint64_t carry = 0;
     bn_node *node;
     list_for_each_entry (node, head, list) {
+        uint64_t tmp = node->val;
         node->val <<= bit;
-        node->val += carry;
-        carry = node->val / BOUND;
-        node->val %= BOUND;
+        node->val |= carry;
+        carry = tmp >> (64 - bit);
     }
     if (carry) {
         bn_newnode(head, carry);
@@ -134,62 +155,39 @@ void __bn_lshift(struct list_head *head, int bit)
 
 void bn_rshift(struct list_head *head, int bit)
 {
-    for (int i = 0; i < bit; i++) {
-        __bn_rshift(head);
+    int tmp = bit;
+    for (; tmp > 64; tmp -= 63) {
+        __bn_rshift(head, 63);
     }
+    __bn_rshift(head, tmp);
 }
 
-void __bn_rshift(struct list_head *head)
+void __bn_rshift(struct list_head *head, int bit)
 {
     uint64_t carry = 0;
     bn_node *node;
     list_for_each_entry_reverse(node, head, list)
     {
-        uint64_t tmp = node->val & 1;
-        node->val >>= 1;
-        node->val += carry;
-        carry = tmp * BOUND / 2;
+        uint64_t tmp = node->val;
+        node->val >>= bit;
+        node->val |= carry;
+        carry = tmp << (64 - bit);
     }
-    bn_node *last = list_last_entry(head, bn_node, list);
-    if (last->val == 0) {
-        bn_size(head)--;
-        list_del(&last->list);
-        kfree(last);
+    if (bn_last_val(head) == 0) {
+        bn_pop(head);
     }
 }
 
-char *bn_to_string(struct list_head *head)
+uint64_t *bn_to_array(struct list_head *head)
 {
-    if (!head || list_empty(head)) {
-        return NULL;
-    }
     bn_clean(head);
-    uint64_t first_num = bn_last_val(head);
-    size_t ceil = MAX_DIGITS;
-    for (size_t floor = 0; floor + 1 != ceil;) {
-        size_t *new = first_num >= pow10[(floor + ceil) / 2] ? &floor : &ceil;
-        *new = (floor + ceil) / 2;
+    uint64_t *res = kmalloc(sizeof(uint64_t) * bn_size(head), GFP_KERNEL);
+    int i = 0;
+    bn_node *node;
+    list_for_each_entry (node, head, list) {
+        res[i++] = node->val;
     }
-    size_t size = (bn_size(head) - 1) * MAX_DIGITS + ceil + 1;
-    char *str = kmalloc(size * sizeof(char), GFP_KERNEL);
-    str[--size] = '\0';
-    // if the bn represent a zero
-    if (unlikely(bn_last_val(head) == 0 && list_is_singular(head))) {
-        str[--size] = '0';
-    } else {
-        bn_node *node;
-        list_for_each_entry (node, head, list) {
-            uint64_t num = node->val;
-            size_t tmp_size = size;
-            for (; num > 0; num /= 10) {
-                str[--size] = num % 10 + '0';
-            }
-            while (tmp_size - size < MAX_DIGITS && size > 0) {
-                str[--size] = '0';
-            }
-        }
-    }
-    return str;
+    return res;
 }
 
 int bn_cmp(struct list_head *a, struct list_head *b)

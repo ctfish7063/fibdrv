@@ -28,4 +28,5 @@ dkms.conf
 
 # test-oriented
 client
+test
 out

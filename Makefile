@@ -10,7 +10,7 @@ PWD := $(shell pwd)
 
 GIT_HOOKS := .git/hooks/applied
 
-all: $(GIT_HOOKS) client
+all: $(GIT_HOOKS) client test
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 $(GIT_HOOKS):
@@ -19,11 +19,14 @@ $(GIT_HOOKS):
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
-	$(RM) client out
+	$(RM) client out test
 load:
 	sudo insmod $(TARGET_MODULE).ko
 unload:
 	sudo rmmod $(TARGET_MODULE) || true >/dev/null
+
+test: test.c
+	$(CC) -o $@ $^
 
 client: client.c
 	$(CC) -o $@ $^
@@ -40,3 +43,13 @@ check: all
 	$(MAKE) unload
 	@diff -u out scripts/expected.txt && $(call pass)
 	@scripts/verify.py
+
+plot: all
+	$(MAKE) unload
+	$(MAKE) load
+	@rm -f fast.txt naive.txt perf.png
+	sudo ./test > fast.txt
+	sudo ./test n > naive.txt
+	$(MAKE) unload
+	@gnuplot plot.gp
+	@eog perf.png
