@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
-// #include <sys/time.h>
 
 #define limit 10000
 #define DIVISOR 100000
@@ -17,6 +17,13 @@
 
 
 #define FIB_DEV "/dev/fibonacci"
+
+long long getnanosec()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000000000L + ts.tv_nsec;
+}
 
 char *bn_2_string(uint64_t *head, int head_size, uint64_t n)
 {
@@ -44,7 +51,6 @@ char *bn_2_string(uint64_t *head, int head_size, uint64_t n)
 
 int main(int argc, char *argv[])
 {
-    long long sz;
     int offset = limit; /* TODO: try test something bigger than the limit */
     int fd = open(FIB_DEV, O_RDWR);
     if (fd < 0) {
@@ -52,20 +58,25 @@ int main(int argc, char *argv[])
         exit(1);
     }
     if (argc > 1) {
-        sz = write(fd, argv[1], strlen(argv[1]));
+        long long sz = write(fd, argv[1], strlen(argv[1]));
         assert(sz == !!(int) (argv[1][0] - 'n'));
     }
+    if (argc > 2) {
+        offset = atoi(argv[2]);
+    }
     for (uint64_t i = 0; i <= offset; i++) {
+        long long kt, ut, st;
         uint64_t n = i;
         size_t list_size =
             n > 1 ? (n * LOG2PHI - LOG2SQRT5) / DIVISOR / 64 + 1 : 1;
         uint64_t *buf = malloc(sizeof(uint64_t) * list_size);
         memset(buf, 0, sizeof(uint64_t) * list_size);
+        st = getnanosec();
         lseek(fd, n, SEEK_SET);
-        sz = read(fd, buf, sizeof(uint64_t) * list_size);
+        kt = read(fd, buf, sizeof(uint64_t) * list_size);
+        ut = getnanosec() - st;
         char *res = bn_2_string(buf, list_size, n);
-        // printf("\n%d,%lld,%s\n", n, sz, res);
-        printf("%lu %lld\n", n, sz);
+        printf("%lu %lld %lld %lld\n", n, kt, ut, ut - kt);
         free(res);
         free(buf);
     }

@@ -44,12 +44,16 @@ check: all
 	@diff -u out scripts/expected.txt && $(call pass)
 	@scripts/verify.py
 
-plot: all
+preprocess: all
+	@ rm -f data.txt fast.txt naive.txt
 	$(MAKE) unload
 	$(MAKE) load
-	@rm -f fast.txt naive.txt perf.png
-	sudo ./test > fast.txt
-	sudo ./test n > naive.txt
+	@python3 scripts/preprocess.py
+	@python3 scripts/preprocess.py -n
 	$(MAKE) unload
-	@gnuplot scripts/plot.gp
-	@eog perf.png
+
+plot: preprocess
+	@rm -f *.png
+	@gnuplot scripts/plot_fast.gp
+	@gnuplot scripts/plot_naive.gp
+	@gnuplot scripts/plot_cmp.gp
