@@ -129,6 +129,11 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
     }
 }
 
+void bn_strassen(struct list_head *a, struct list_head *b, struct list_head *c)
+{
+    ;
+}
+
 void bn_lshift(struct list_head *head, int bit)
 {
     int tmp = bit;
@@ -178,7 +183,7 @@ void __bn_rshift(struct list_head *head, int bit)
     }
 }
 
-uint64_t *bn_to_array(struct list_head *head)
+uint64_t *bn_to_array64(struct list_head *head)
 {
     bn_clean(head);
     uint64_t *res = kmalloc(sizeof(uint64_t) * bn_size(head), GFP_KERNEL);
@@ -186,6 +191,21 @@ uint64_t *bn_to_array(struct list_head *head)
     bn_node *node;
     list_for_each_entry (node, head, list) {
         res[i++] = node->val;
+    }
+    return res;
+}
+
+uint64_t *bn_to_array16(struct list_head *head, size_t size)
+{
+    bn_clean(head);
+    uint64_t *res = kmalloc(sizeof(uint64_t) * size, GFP_KERNEL);
+    int i = 0;
+    bn_node *node;
+    list_for_each_entry (node, head, list) {
+        res[i++] = node->val & 0xffff;
+        res[i++] = (node->val >> 16) & 0xffff;
+        res[i++] = (node->val >> 32) & 0xffff;
+        res[i++] = (node->val >> 48) & 0xffff;
     }
     return res;
 }

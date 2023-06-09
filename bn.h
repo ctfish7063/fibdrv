@@ -244,6 +244,16 @@ void __bn_sub(struct list_head *a, struct list_head *b);
 void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c);
 
 /**
+ * bn_strassen: multiply two bns and store result to c
+ * using schonhage-strassen algorithm
+ * c = a * b
+ * @a: first bn
+ * @b: second bn
+ * @c: result bn
+ */
+void bn_strassen(struct list_head *a, struct list_head *b, struct list_head *c);
+
+/**
  * bn_lshift: left shift a bn by bit
  * @head: bn to be shifted
  * @bit: number of bits to be shifted
@@ -274,12 +284,20 @@ void bn_rshift(struct list_head *head, int bit);
 void __bn_rshift(struct list_head *head, int bit);
 
 /**
- * bn_to_array: convert a bn to an array
+ * bn_to_array64: convert a bn to an array
  * the array has the same order with bn_list
  * @head: bn to be converted
  * @return: array of uint64_t
  */
-uint64_t *bn_to_array(struct list_head *head);
+uint64_t *bn_to_array64(struct list_head *head);
+
+/**
+ * bn_to_array16: convert a bn to an array
+ * divide each uint64_t into 4 16 bits chuncks
+ * @head: bn to be converted
+ * @return: array of uint64_t
+ */
+uint64_t *bn_to_array16(struct list_head *head, size_t size);
 
 /**
  * bn_compare: compare two bn lists
