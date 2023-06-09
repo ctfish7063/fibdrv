@@ -1,4 +1,11 @@
 #include "bn.h"
+#include "ntt.h"
+
+#define chunck_size 8
+#define chunk_mask 0xff
+#define mask 0xffffffffffffffff
+#define val_size 64
+#define per_size (val_size / chunck_size)
 
 void bn_add(struct list_head *a, struct list_head *b)
 {
@@ -131,7 +138,58 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
 
 void bn_strassen(struct list_head *a, struct list_head *b, struct list_head *c)
 {
-    ;
+    int a_size = bn_size(a) * per_size - CLZ(bn_last_val(a)) / chunck_size;
+    int b_size = bn_size(b) * per_size - CLZ(bn_last_val(b)) / chunck_size;
+    // could not do ntt if size is too small
+    if (a_size < 2 || b_size < 2) {
+        bn_mul(a, b, c);
+        return;
+    }
+    // zero padding
+    int size = nextpow2((uint64_t)(a_size + b_size - 1));
+    uint64_t *a_array = bn_split(a, size);
+    uint64_t *b_array = bn_split(b, size);
+    // number theoretic transform
+    ntt(a_array, size, mod, rou);
+    ntt(b_array, size, mod, rou);
+    // pointwise multiplication
+    for (int i = 0; i < size; i++) {
+        a_array[i] *= b_array[i] % mod;
+    }
+    // inverse ntt
+    intt(a_array, size, mod, rou);
+    // carrying
+    uint64_t carry = 0;
+    for (int i = 0; i < size; i++) {
+        a_array[i] += carry;
+        carry = a_array[i] >> chunck_size;
+        a_array[i] &= chunk_mask;
+    }
+    // convert to bn
+    for (; bn_size(c) < size / per_size;) {
+        bn_newnode(c, 0);
+    }
+    bn_node *node;
+    int i = 0;
+    list_for_each_entry (node, c, list) {
+        // four at a time : 8 bits to uint64_t
+        uint64_t val = 0;
+        for (int j = 0; j < val_size; j += chunck_size) {
+            if (i < size) {
+                val |= a_array[i++] << j;
+            } else if (carry) {
+                val |= (carry & chunk_mask) << j;
+                carry >>= chunck_size;
+            }
+        }
+        node->val = val;
+    }
+    if (carry) {
+        bn_newnode(c, carry);
+    }
+    bn_clean(c);
+    kfree(a_array);
+    kfree(b_array);
 }
 
 void bn_lshift(struct list_head *head, int bit)
@@ -183,7 +241,7 @@ void __bn_rshift(struct list_head *head, int bit)
     }
 }
 
-uint64_t *bn_to_array64(struct list_head *head)
+uint64_t *bn_to_array(struct list_head *head)
 {
     bn_clean(head);
     uint64_t *res = kmalloc(sizeof(uint64_t) * bn_size(head), GFP_KERNEL);
@@ -195,17 +253,17 @@ uint64_t *bn_to_array64(struct list_head *head)
     return res;
 }
 
-uint64_t *bn_to_array16(struct list_head *head, size_t size)
+uint64_t *bn_split(struct list_head *head, size_t size)
 {
     bn_clean(head);
     uint64_t *res = kmalloc(sizeof(uint64_t) * size, GFP_KERNEL);
+    memset(res, 0, sizeof(uint64_t) * size);
     int i = 0;
     bn_node *node;
     list_for_each_entry (node, head, list) {
-        res[i++] = node->val & 0xffff;
-        res[i++] = (node->val >> 16) & 0xffff;
-        res[i++] = (node->val >> 32) & 0xffff;
-        res[i++] = (node->val >> 48) & 0xffff;
+        for (int j = 0; j < val_size; j += chunck_size) {
+            res[i++] |= (node->val >> j) & chunk_mask;
+        }
     }
     return res;
 }

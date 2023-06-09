@@ -77,6 +77,22 @@ static inline void fast_doubling(struct list_head *fib_n0,
     bn_mul(fib_n1, fib_n0, fib_2n0);
 }
 
+static inline void fast_strassen(struct list_head *fib_n0,
+                                 struct list_head *fib_n1,
+                                 struct list_head *fib_2n0,
+                                 struct list_head *fib_2n1)
+{
+    // fib(2n+1) = fib(n)^2 + fib(n+1)^2
+    // use fib_2n0 to store the result temporarily
+    bn_strassen(fib_n0, fib_n0, fib_2n1);
+    bn_strassen(fib_n1, fib_n1, fib_2n0);
+    bn_add(fib_2n1, fib_2n0);
+    // fib(2n) = fib(n) * (2 * fib(n+1) - fib(n))
+    bn_lshift(fib_n1, 1);
+    bn_sub(fib_n1, fib_n0);
+    bn_strassen(fib_n1, fib_n0, fib_2n0);
+}
+
 /**
  * fib_sequence: calculate the fibonacci number with fast doubling algorithm.
  * It's a bottom up approach to avoid recursion.
@@ -98,11 +114,12 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
     uint8_t count = 63 - CLZ(k);
     BN_INIT_VAL(a, 0, 1);
     BN_INIT_VAL(b, 1, 1);
-    BN_INIT(c, 0);
-    BN_INIT(d, 0);
+    BN_INIT_VAL(c, 0, 0);
+    BN_INIT_VAL(d, 0, 0);
     int n = 1;
     for (uint8_t i = count; i-- > 0;) {
-        fast_doubling(a, b, c, d);
+        // fast_doubling(a, b, c, d);
+        fast_strassen(a, b, c, d);
         if (k & (1LL << i)) {
             bn_add(c, d);
             XOR_SWAP(a, d);
@@ -116,9 +133,7 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
     }
     *fib = bn_to_array(a);
     size_t res = bn_size(a);
-    // for (int i = 0; i < res; i++) {
-    //     printk(KERN_INFO "fibdrv[%llu][%i]: %llu",k, i, (*fib)[i]);
-    // }
+
     bn_free(a);
     bn_free(b);
     bn_free(c);
@@ -130,7 +145,7 @@ static size_t fib_time_proxy(long long k, uint64_t **fib)
 {
     size_t ret = 0;
     if (mode) {
-        printk(KERN_INFO "fibdrv: fast doubling mode");
+        printk(KERN_INFO "fibdrv: fast strassen mode");
         kt = ktime_get();
         ret = fib_sequence(k, fib);
         kt = ktime_sub(ktime_get(), kt);
@@ -147,6 +162,7 @@ static size_t my_copy_to_user(char *buf, uint64_t *src, size_t size)
 {
     size_t lbytes = src[size - 1] ? CLZ(src[size - 1]) >> 3 : 7;
     size_t i = size * sizeof(uint64_t) - lbytes;
+    printk(KERN_INFO "fibdrv: list size %zu", size);
     printk(KERN_INFO "fibdrv: total %zu bytes, copy_to_user %zu bytes",
            size * sizeof(uint64_t), i);
     // for (int j = 0; j < size; j++) {

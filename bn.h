@@ -284,20 +284,19 @@ void bn_rshift(struct list_head *head, int bit);
 void __bn_rshift(struct list_head *head, int bit);
 
 /**
- * bn_to_array64: convert a bn to an array
+ * bn_to_array: convert a bn to an array
  * the array has the same order with bn_list
  * @head: bn to be converted
  * @return: array of uint64_t
  */
-uint64_t *bn_to_array64(struct list_head *head);
+uint64_t *bn_to_array(struct list_head *head);
 
 /**
- * bn_to_array16: convert a bn to an array
- * divide each uint64_t into 4 16 bits chuncks
+ * bn_split : split a bn into chuncks of 8 bits
  * @head: bn to be converted
  * @return: array of uint64_t
  */
-uint64_t *bn_to_array16(struct list_head *head, size_t size);
+uint64_t *bn_split(struct list_head *head, size_t size);
 
 /**
  * bn_compare: compare two bn lists
