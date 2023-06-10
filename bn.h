@@ -254,6 +254,15 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c);
 void bn_strassen(struct list_head *a, struct list_head *b, struct list_head *c);
 
 /**
+ * bn_sqr_strassen: square a bn and store result to c
+ * using schonhage-strassen algorithm
+ * c = a ^ 2
+ * @a: base bn
+ * @c: result bn
+ */
+void bn_sqr_strassen(struct list_head *a, struct list_head *c);
+
+/**
  * bn_lshift: left shift a bn by bit
  * @head: bn to be shifted
  * @bit: number of bits to be shifted

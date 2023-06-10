@@ -84,8 +84,8 @@ static inline void fast_strassen(struct list_head *fib_n0,
 {
     // fib(2n+1) = fib(n)^2 + fib(n+1)^2
     // use fib_2n0 to store the result temporarily
-    bn_strassen(fib_n0, fib_n0, fib_2n1);
-    bn_strassen(fib_n1, fib_n1, fib_2n0);
+    bn_sqr_strassen(fib_n0, fib_2n1);
+    bn_sqr_strassen(fib_n1, fib_2n0);
     bn_add(fib_2n1, fib_2n0);
     // fib(2n) = fib(n) * (2 * fib(n+1) - fib(n))
     bn_lshift(fib_n1, 1);
