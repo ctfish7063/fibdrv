@@ -138,6 +138,10 @@ void bn_mul(struct list_head *a, struct list_head *b, struct list_head *c)
 
 void bn_strassen(struct list_head *a, struct list_head *b, struct list_head *c)
 {
+    if (!a || !b || !c) {
+        printk(KERN_ERR "bn_strassen: invalid input\n");
+        return;
+    }
     int a_size = bn_size(a) * per_size - CLZ(bn_last_val(a)) / chunck_size;
     int b_size = bn_size(b) * per_size - CLZ(bn_last_val(b)) / chunck_size;
     // could not do ntt if size is too small
@@ -147,8 +151,14 @@ void bn_strassen(struct list_head *a, struct list_head *b, struct list_head *c)
     }
     // zero padding
     int size = nextpow2((uint64_t)(a_size + b_size - 1));
+    printk(KERN_INFO "bn_strassen: size = %d, a:%i, b:%i\n", size, a_size,
+           b_size);
     uint64_t *a_array = bn_split(a, size);
     uint64_t *b_array = bn_split(b, size);
+    if (!a_array || !b_array) {
+        printk(KERN_ERR "bn_strassen: memory allocation failed\n");
+        return;
+    }
     // number theoretic transform
     ntt(a_array, size, mod, rou);
     ntt(b_array, size, mod, rou);
@@ -194,6 +204,10 @@ void bn_strassen(struct list_head *a, struct list_head *b, struct list_head *c)
 
 void bn_sqr_strassen(struct list_head *a, struct list_head *c)
 {
+    if (!a || !c) {
+        printk(KERN_ERR "bn_strassen: invalid input\n");
+        return;
+    }
     int a_size = bn_size(a) * per_size - CLZ(bn_last_val(a)) / chunck_size;
     // could not do ntt if size is too small
     if (a_size < 2) {
@@ -202,7 +216,12 @@ void bn_sqr_strassen(struct list_head *a, struct list_head *c)
     }
     // zero padding
     int size = nextpow2((uint64_t)(2 * a_size - 1));
+    printk(KERN_INFO "bn_sqr_strassen: size = %d, a:%i\n", size, a_size);
     uint64_t *a_array = bn_split(a, size);
+    if (!a_array) {
+        printk(KERN_ERR "bn_strassen: memory allocation failed\n");
+        return;
+    }
     // number theoretic transform
     ntt(a_array, size, mod, rou);
     // pointwise multiplication
@@ -307,16 +326,27 @@ uint64_t *bn_to_array(struct list_head *head)
 
 uint64_t *bn_split(struct list_head *head, size_t size)
 {
+    if (!head) {
+        printk(KERN_ERR "bn_split: invalid input\n");
+        return NULL;
+    }
     bn_clean(head);
+    printk(KERN_INFO "bn_split: size = %ld\n", size);
     uint64_t *res = kmalloc(sizeof(uint64_t) * size, GFP_KERNEL);
-    memset(res, 0, sizeof(uint64_t) * size);
+    if (!res) {
+        printk(KERN_ERR "bn_split: memory allocation failed\n");
+        return NULL;
+    }
+    memset((char *) res, 0, sizeof(uint64_t) * size);
     int i = 0;
     bn_node *node;
     list_for_each_entry (node, head, list) {
         for (int j = 0; j < val_size; j += chunck_size) {
-            res[i++] |= (node->val >> j) & chunk_mask;
+            if (i < size)
+                res[i++] |= (node->val >> j) & chunk_mask;
         }
     }
+    printk(KERN_INFO "bn_split: i = %d\n", i);
     return res;
 }
 

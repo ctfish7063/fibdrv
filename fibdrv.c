@@ -118,7 +118,54 @@ static inline size_t fib_sequence(long long k, uint64_t **fib)
     BN_INIT_VAL(d, 0, 0);
     int n = 1;
     for (uint8_t i = count; i-- > 0;) {
-        // fast_doubling(a, b, c, d);
+        fast_doubling(a, b, c, d);
+        // fast_strassen(a, b, c, d);
+        if (k & (1LL << i)) {
+            bn_add(c, d);
+            XOR_SWAP(a, d);
+            XOR_SWAP(b, c);
+            n = 2 * n + 1;
+        } else {
+            XOR_SWAP(a, c);
+            XOR_SWAP(b, d);
+            n = 2 * n;
+        }
+    }
+    *fib = bn_to_array(a);
+    size_t res = bn_size(a);
+
+    bn_free(a);
+    bn_free(b);
+    bn_free(c);
+    bn_free(d);
+    return res;
+}
+
+/**
+ * fib_sequence: calculate the fibonacci number with fast doubling algorithm.
+ * It's a bottom up approach to avoid recursion.
+ * @param k: the index of the fibonacci number
+ * @return: the fibonacci number in char*
+ */
+static inline size_t fib_sequence_strassen(long long k, uint64_t **fib)
+{
+    if (unlikely(k < 0)) {
+        return 0;
+    }
+    // return fib[n] without calculation for n <= 2
+    if (unlikely(k <= 2)) {
+        *fib = kmalloc(sizeof(uint64_t), GFP_KERNEL);
+        (*fib)[0] = !!k;
+        return 1;
+    }
+    // starting from n = 1, fib[n] = 1, fib [n+1] = 1
+    uint8_t count = 63 - CLZ(k);
+    BN_INIT_VAL(a, 0, 1);
+    BN_INIT_VAL(b, 1, 1);
+    BN_INIT_VAL(c, 0, 0);
+    BN_INIT_VAL(d, 0, 0);
+    int n = 1;
+    for (uint8_t i = count; i-- > 0;) {
         fast_strassen(a, b, c, d);
         if (k & (1LL << i)) {
             bn_add(c, d);
@@ -145,14 +192,14 @@ static size_t fib_time_proxy(long long k, uint64_t **fib)
 {
     size_t ret = 0;
     if (mode) {
-        printk(KERN_INFO "fibdrv: fast strassen mode");
+        printk(KERN_INFO "fibdrv: fast mode");
         kt = ktime_get();
         ret = fib_sequence(k, fib);
         kt = ktime_sub(ktime_get(), kt);
     } else {
-        printk(KERN_INFO "fibdrv: naive mode");
+        printk(KERN_INFO "fibdrv: strassen mode");
         kt = ktime_get();
-        ret = fib_sequence_naive(k, fib);
+        ret = fib_sequence_strassen(k, fib);
         kt = ktime_sub(ktime_get(), kt);
     }
     return ret;
